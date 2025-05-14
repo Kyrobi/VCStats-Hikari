@@ -1,0 +1,7 @@
+/__pycache__
+/venv
+config.py
+database.db
+/objects/__pycache__
+/handlers/__pycache__
+/commands/__pycache__
