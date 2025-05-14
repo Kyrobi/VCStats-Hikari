@@ -1,12 +1,18 @@
-import sqlite3
+import aiosqlite
 import os
 from typing import List, Optional
+
+DATABASE_NOT_CONNECTED_MESSAGE = "Database is not connected..."
 
 class DatabaseHandler:
 
     DATABASE_FILE_NAME = "database.db"
 
+    # __init__ can't be async
     def __init__(self):
+        self.conn: Optional[aiosqlite.Connection] = None
+
+    async def init(self):
         if not os.path.exists(self.DATABASE_FILE_NAME):
             try:
                 with open(self.DATABASE_FILE_NAME, "w"):
@@ -17,9 +23,23 @@ class DatabaseHandler:
         # else:
         #     print("File already exists.")
         
-        self.create_new_table()
+        self.conn = await aiosqlite.connect(self.DATABASE_FILE_NAME)
+        await self.conn.execute("PRAGMA journal_mode=WAL;")  # Improves concurrency
+        await self.conn.execute("PRAGMA synchronous=NORMAL;")
+        await self.conn.commit()
+        await self.create_new_table()
 
-    def create_new_table(self):
+    async def uninitialize(self):
+        if self.conn:
+            try:
+                await self.conn.close()
+                print("Database connection closed.")
+            except aiosqlite.Error as e:
+                print(f"Error closing the database connection: {e}")
+            finally:
+                self.conn = None
+
+    async def create_new_table(self):
         create_stats_table = """
         CREATE TABLE IF NOT EXISTS stats (
             userID INTEGER NOT NULL DEFAULT 0, 
@@ -30,13 +50,16 @@ class DatabaseHandler:
         );
         """
         try:
-            with sqlite3.connect(self.DATABASE_FILE_NAME) as conn:
-                conn.execute(create_stats_table)
-        except sqlite3.Error as error:
+            if self.conn is not None:
+                await self.conn.execute(create_stats_table)
+            else:
+                print(DATABASE_NOT_CONNECTED_MESSAGE)
+                exit()
+        except aiosqlite.Error as error:
             print(f"Database error: {error}")
 
-    @staticmethod
-    async def insert(user_id: int, time_difference: int, server_id: int):
+
+    async def insert(self, user_id: int, time_difference: int, server_id: int):
         sql_command = """
         INSERT INTO stats (userID, serverID, time) 
         VALUES (?, ?, ?) 
@@ -44,70 +67,53 @@ class DatabaseHandler:
         DO UPDATE SET time = time + ?;
         """
         try:
-            with sqlite3.connect(DatabaseHandler.DATABASE_FILE_NAME) as conn:
-                conn.execute(sql_command, (user_id, server_id, time_difference, time_difference))
-        except sqlite3.Error as error:
+            if self.conn is not None:
+                await self.conn.execute(sql_command, (user_id, server_id, time_difference, time_difference))
+                await self.conn.commit()
+            else:
+                print(DATABASE_NOT_CONNECTED_MESSAGE)
+        except aiosqlite.Error as error:
             print(f"Error inserting data: {error}")
 
-    @staticmethod
-    async def bulk_insert(user_ids: List[int], time_differences: List[int], server_ids: List[int]):
+
+    async def bulk_insert(self, user_ids: List[int], time_differences: List[int], server_ids: List[int]):
         try:
-            with sqlite3.connect(DatabaseHandler.DATABASE_FILE_NAME) as conn:
+            if self.conn is not None:
                 for user_id, time, server_id in zip(user_ids, time_differences, server_ids):
-                    conn.execute("""
+                    await self.conn.execute("""
                     INSERT INTO stats (userID, serverID, time) 
                     VALUES (?, ?, ?) 
                     ON CONFLICT(userID, serverID) 
                     DO UPDATE SET time = time + ?;
                     """, (user_id, server_id, time, time))
-        except sqlite3.Error as error:
+                await self.conn.commit()
+            else:
+                print(DATABASE_NOT_CONNECTED_MESSAGE)
+        except aiosqlite.Error as error:
             print(f"Error performing bulk insert: {error}")
 
-    @staticmethod
-    async def get_user_time(user_id: int, server_id: int) -> int:
+
+    async def get_user_time(self, user_id: int, server_id: int) -> Optional[int]:
         try:
-            with sqlite3.connect(DatabaseHandler.DATABASE_FILE_NAME) as conn:
-                cursor = conn.execute(
+            if self.conn is not None:
+                async with self.conn.execute(
                     "SELECT time FROM stats WHERE userID = ? AND serverID = ?",
                     (user_id, server_id)
-                )
-                result = cursor.fetchone()
-                return result[0] if result else 0
-        except sqlite3.Error as error:
+                ) as cursor:
+                    result = await cursor.fetchone()
+                    return result[0] if result else 0
+            else:
+                print(DATABASE_NOT_CONNECTED_MESSAGE)
+                return None
+        except aiosqlite.Error as error:
             print(f"Error fetching time: {error}")
-            return 0
-    
-    @staticmethod
-    async def get_player_leaderboard_position(guild_id: int, user_id: int) -> Optional[int]:
-        try:
-            with sqlite3.connect(DatabaseHandler.DATABASE_FILE_NAME) as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    WITH getServerMembers AS (
-                    SELECT userID, time,
-                            ROW_NUMBER() OVER (ORDER BY time DESC) AS row_num
-                    FROM stats
-                    WHERE serverID = ?
-                    )
-                    SELECT row_num
-                    FROM getServerMembers
-                    WHERE userID = ?;
-                """, (guild_id, user_id))
-                
-                result = cursor.fetchone()
-                print(f"DB result: {result[0]}")
-                return result[0] if result else None
-            
-        except sqlite3.Error as e:
-            print(f"SQLite error: {e}")
             return None
         
-    @staticmethod
-    async def get_user_time_and_position(user_id: int, server_id: int) -> tuple[int, Optional[int]]:
+
+    async def get_user_time_and_position(self, user_id: int, server_id: int) -> tuple[int, Optional[int]]:
         try:
-            with sqlite3.connect(DatabaseHandler.DATABASE_FILE_NAME) as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
+            if self.conn is not None:
+                async with self.conn.execute("""
                     WITH leaderboard AS (
                         SELECT 
                             userID, 
@@ -121,12 +127,39 @@ class DatabaseHandler:
                         position
                     FROM leaderboard
                     WHERE userID = ?
-                """, (server_id, user_id))
-                
-                result = cursor.fetchone()
-                print(f"Result[0] = {result[0]}, result[1] = {result[1]}")
-                return (result[0], result[1]) if result else (0, None)
-                
-        except sqlite3.Error as error:
+                """, (server_id, user_id)) as cursor:
+                    result = await cursor.fetchone()
+                    return (result[0], result[1]) if result else (0, None)
+            else:
+                print(DATABASE_NOT_CONNECTED_MESSAGE)
+                return (0, None)
+        except aiosqlite.Error as error:
             print(f"Error fetching time and position: {error}")
             return (0, None)
+        
+
+    async def get_leaderboard_members_and_time_from_database(self, guild_id: int) -> tuple[list[int], list[int]]:
+        users: List[int] = []
+        times: List[int] = []
+        
+        try:
+            if self.conn is not None:
+                async with self.conn.execute(
+                    "SELECT userID, time FROM stats WHERE serverID = ? ORDER BY time DESC LIMIT 1000",
+                    (guild_id,)
+                ) as cursor:
+                    rows = await cursor.fetchall()
+                    
+                    for row in rows:
+                        user_id = row[0]
+                        time = row[1]
+
+                        users.append(user_id)
+                        times.append(time)
+            else:
+                print(DATABASE_NOT_CONNECTED_MESSAGE)
+                        
+        except aiosqlite.Error as e:
+            print(f"Database error: {e}")
+            
+        return users, times

@@ -1,10 +1,10 @@
-import time
 import lightbulb
 
 from typing import Optional
-from helper import save_tracking_stats_single, make_key, milliseconds_to_timestamp, get_user_time_and_leaderboard_position, tracking_queue
+from helper import UserTracker
 
 plugin = lightbulb.Plugin("command_stats")
+user_tracker = UserTracker()
 
 @plugin.command
 @lightbulb.command("stats", "Shows your total time in the voice chat for this server")
@@ -28,18 +28,18 @@ async def status_command(e: lightbulb.Context) -> None:
         await e.respond("This command can only be used inside a server")
         return
     
-    db_total_time, leaderboard_position = await get_user_time_and_leaderboard_position(user_id, guild_id) # Current time in the database
+    # If the user is actively in the VC, we add onto the time in the database
+    dict_key = user_tracker.make_key(user_id, guild_id)
+    if dict_key in user_tracker.get_tracking_queue():
+        await user_tracker.save_tracking_stats_single(user_id, guild_id)
+    
+    db_total_time, leaderboard_position = await user_tracker.get_user_time_and_leaderboard_position(user_id, guild_id) # Current time in the database
+
     new_total_time: Optional[int] = None
 
-    # If the user is actively in the VC, we add onto the time in the database
-    dict_key = make_key(user_id, guild_id)
-    if dict_key in tracking_queue:
-        time_delta: int = int(time.time()) - int(tracking_queue[dict_key].get_joined_time())
-        
-        new_total_time = db_total_time + time_delta
+    # print(f"db_total_time: {db_total_time}, leaderboard_position: {leaderboard_position}")
 
-        await save_tracking_stats_single(user_id, guild_id)
-        # Purposfully not pop the data from the dictionary since it's assumed the user is still in the VC
+    db_total_time = 0 if db_total_time is None else db_total_time
 
     if leaderboard_position is not None:
         # If the user is in the VC while using this command, we fetch the database time with the time delta added on
@@ -47,7 +47,7 @@ async def status_command(e: lightbulb.Context) -> None:
             await e.respond(
                 f"{e.author.mention}\n"
                 f"Leaderboard Ranking: **#{leaderboard_position}**\n"
-                f"Total Time Spent: **{milliseconds_to_timestamp(new_total_time)}**",
+                f"Total Time Spent: **{seconds_to_timestamp(new_total_time)}**",
                 user_mentions=True
             )
         # If the user is not in the VC, just grab the time from the database
@@ -55,7 +55,7 @@ async def status_command(e: lightbulb.Context) -> None:
             await e.respond(
                 f"{e.author.mention}\n"
                 f"Leaderboard Ranking: **#{leaderboard_position}**\n"
-                f"Total Time Spent: **{milliseconds_to_timestamp(db_total_time)}**",
+                f"Total Time Spent: **{user_tracker.seconds_to_timestamp(db_total_time)}**",
                 user_mentions=True
             )
 

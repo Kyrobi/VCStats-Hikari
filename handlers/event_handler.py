@@ -1,10 +1,11 @@
 from typing import Optional
-from helper import save_tracking_stats_single, start_tracking_user, make_key, tracking_queue
+from helper import UserTracker
 
 import lightbulb
 import hikari
 
 plugin = lightbulb.Plugin("event_handler")
+user_tracker = UserTracker()
 
 @plugin.listener(hikari.VoiceStateUpdateEvent) # type: ignore
 async def on_voice_event(e: hikari.VoiceStateUpdateEvent):
@@ -47,7 +48,7 @@ async def on_voice_event(e: hikari.VoiceStateUpdateEvent):
 
 async def handle_join(voice_state: hikari.VoiceState):
     print("Joined channel")
-    await start_tracking_user(voice_state.user_id, voice_state.guild_id)
+    await user_tracker.start_tracking_user(voice_state.user_id, voice_state.guild_id)
 
 
 async def handle_leave(voice_state: hikari.VoiceState):
@@ -57,10 +58,10 @@ async def handle_leave(voice_state: hikari.VoiceState):
     user_id = voice_state.user_id
     guild_id = voice_state.guild_id
 
-    await save_tracking_stats_single(user_id, guild_id)
+    await user_tracker.save_tracking_stats_single(user_id, guild_id)
 
-    dict_key: str = make_key(user_id, guild_id)
-    tracking_queue.pop(dict_key, None)
+    dict_key: str = user_tracker.make_key(user_id, guild_id)
+    user_tracker.get_tracking_queue().pop(dict_key, None)
 
 async def handle_switch(old_voice_state: hikari.VoiceState, new_voice_state: hikari.VoiceState):
     # UPDATE: We don't actually care about if the user switch channels
