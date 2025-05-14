@@ -32,6 +32,7 @@ class DatabaseHandler:
     async def uninitialize(self):
         if self.conn:
             try:
+                await self.conn.commit()
                 await self.conn.close()
                 print("Database connection closed.")
             except aiosqlite.Error as e:
@@ -52,6 +53,7 @@ class DatabaseHandler:
         try:
             if self.conn is not None:
                 await self.conn.execute(create_stats_table)
+                await self.conn.commit()
             else:
                 print(DATABASE_NOT_CONNECTED_MESSAGE)
                 exit()
