@@ -1,13 +1,12 @@
 import config
 import hikari
 import lightbulb
+import asyncio
 
-from helper import initialize, uninitialize, get_tracking_queue, make_key, start_tracking_user
-from typing import Dict, Mapping
+from helper import initialize, save_tracking_stats_single, uninitialize, get_tracking_queue, make_key, start_tracking_user
+from typing import Dict, List, Mapping, Optional
 
 from objects.user import User
-
-user_tracker_queue: Dict[str, User] = get_tracking_queue()
 
 
 # Initialize the bot - NEW SYNTAX for Lightbulb 2.x
@@ -35,7 +34,9 @@ async def on_started(event: hikari.StartedEvent) -> None:
     await initialize(bot)
 
     # await user_tracker.add_all_users_in_voice_channels(bot)
-    print(f"Initialized tracking for {len(user_tracker_queue)} users already in voice channels")
+    print(f"Initialized tracking for {len(get_tracking_queue())} users already in voice channels")
+
+    asyncio.create_task(queue_updater(60 * 60 * 1)) # Runs every 1 hour
 
 
 # Function when the bot is shutting down
@@ -56,9 +57,43 @@ async def on_guild_available(event: hikari.GuildAvailableEvent) -> None:
     for user_id, user_voice_state in voice_states.items():
         dict_key: str = make_key(user_id, event.guild_id)
         
-        if dict_key not in user_tracker_queue:
+        if dict_key not in get_tracking_queue():
             await start_tracking_user(user_id, event.guild_id)
             print(f"{user_voice_state.member} added to tracking queue on startup...")
 
+
+async def queue_updater(interval_seconds: int) -> None:
+    """
+    Runs through the tracking queue, and see if the user is still in the VC. If not, remove them from the 
+    queue. This is used to catch any edgecases that might happen where the user is no longer in the
+    voice channel without the bot catching it. For example, a user leaving a voice channel while an API
+    outage occurs, so the leave event on the bot is never fired.
+    """
+    print("Starting tracking queue auto clearing scheduler")
+
+    keys_to_remove: List[str] = []
+
+    while True:
+        print("Running tracking queue auto clearing")
+
+        tracking_queue: Dict[str, User] = get_tracking_queue()
+
+        for key in tracking_queue:
+            user_id, guild_id = map(int, key.split("-"))
+            # print(f"Tracking queue uid: {user_id}, gid: {guild_id}")
+            user_voice_state: Optional[hikari.VoiceState] = bot.cache.get_voice_state(guild_id, user_id)
+
+            # If the user is not in voice channel and they are still in the queue, we add it to the removal list
+            if user_voice_state is None:
+                if key in tracking_queue:
+                    keys_to_remove.append(key)
+                    await save_tracking_stats_single(user_id1=user_id, guild_id1=guild_id)
+
+        # Now remove it from the actually dictionary
+        for key in keys_to_remove:
+            tracking_queue.pop(key, None)
+
+        keys_to_remove.clear() # Clean up the memory
+        await asyncio.sleep(interval_seconds)
 
 bot.run()
