@@ -35,6 +35,7 @@ async def log_info_to_channel(client: Plugin, channel_id: int, message: str) -> 
 def get_tracking_queue() -> Dict[str, User]:
     return tracking_queue
 
+
 async def start_tracking_user(user_id: int, guild_id: int):
     # Original Java code saved the time in milliseconds, so
     # we need to convert the time into milliseconds as well

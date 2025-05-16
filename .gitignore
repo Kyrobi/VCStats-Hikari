@@ -7,3 +7,4 @@ database.db
 /commands/__pycache__
 database.db-shm
 database.db-wal
+todo.txt

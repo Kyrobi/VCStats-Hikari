@@ -2,12 +2,13 @@ import config
 import hikari
 import lightbulb
 
-from helper import initialize, uninitialize, get_tracking_queue, make_key
+from helper import initialize, uninitialize, get_tracking_queue, make_key, start_tracking_user
 from typing import Dict, Mapping
 
 from objects.user import User
 
 user_tracker_queue: Dict[str, User] = get_tracking_queue()
+
 
 # Initialize the bot - NEW SYNTAX for Lightbulb 2.x
 bot = lightbulb.BotApp(
@@ -36,19 +37,28 @@ async def on_started(event: hikari.StartedEvent) -> None:
     # await user_tracker.add_all_users_in_voice_channels(bot)
     print(f"Initialized tracking for {len(user_tracker_queue)} users already in voice channels")
 
+
 # Function when the bot is shutting down
 @bot.listen(hikari.StoppingEvent)
 async def on_stopping(event: hikari.StoppingEvent) -> None:
     await uninitialize()
     print("Bot shutting down")
 
+
+# Adds all the existing users in the voice channel into the queue if the bot were to restart
 @bot.listen(hikari.GuildAvailableEvent)
 async def on_guild_available(event: hikari.GuildAvailableEvent) -> None:
 
+    # Actually returns a mapping of user IDs to their voice channels.
+    # So it doesn't return all the voice channel, but all the users that are in the voice channels
     voice_states: Mapping[hikari.Snowflake, hikari.VoiceState] = event.guild.get_voice_states()
 
-    for voice_state in voice_states.values():
-        print(voice_state.member)
+    for user_id, user_voice_state in voice_states.items():
+        dict_key: str = make_key(user_id, event.guild_id)
+        
+        if dict_key not in user_tracker_queue:
+            await start_tracking_user(user_id, event.guild_id)
+            print(f"{user_voice_state.member} added to tracking queue on startup...")
 
 
 bot.run()
