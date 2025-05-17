@@ -88,7 +88,7 @@ async def get_user_time_and_leaderboard_position(user_id: int, guild_id: int) ->
         return None, None
 
 
-async def get_leaderboard_members_and_time(guild_id: int) -> tuple[Optional[list[int]], Optional[list[int]]]:
+async def get_leaderboard_members_and_time(guild_id: int) -> tuple[Optional[List[int]], Optional[List[int]]]:
     if db_handler is not None:
         return await db_handler.get_leaderboard_members_and_time_from_database(guild_id)
     else:
@@ -100,7 +100,8 @@ def seconds_to_timestamp(seconds: int) -> str:
     hours = seconds // 3600
     minutes = (seconds % 3600) // 60
     seconds = seconds % 60
-    return f"{hours:,}h {minutes}m {seconds}s"
+    # return f"{hours:,}h {minutes}m {seconds}s"
+    return f"{hours:,}h {minutes}m"
 
 @staticmethod
 def make_key(user_id: int, guild_id: int) -> str:

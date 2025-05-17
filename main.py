@@ -25,7 +25,7 @@ async def on_starting(event: hikari.StartingEvent) -> None:
     bot.load_extensions("commands.command_stats")
     bot.load_extensions("commands.command_help")
     bot.load_extensions("commands.command_donate")
-    # bot.load_extensions("commands.command_leaderboard")
+    bot.load_extensions("commands.command_leaderboard")
 
 # After bot has fully started
 @bot.listen(hikari.StartedEvent)
