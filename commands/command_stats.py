@@ -8,6 +8,7 @@ plugin = lightbulb.Plugin("command_stats")
 user_tracker: Dict[str, User] = get_tracking_queue()
 
 @plugin.command
+@lightbulb.app_command_permissions(dm_enabled=False)
 @lightbulb.command("stats", "Shows your total time in the voice chat for this server")
 @lightbulb.implements(lightbulb.SlashCommand)
 async def status_command(e: lightbulb.Context) -> None:

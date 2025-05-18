@@ -1,11 +1,10 @@
-from typing import Dict, List, Optional
-from lightbulb import Plugin
+import hikari
 import lightbulb
-from handlers.database_handler import DatabaseHandler
-from objects.user import User
-
 import time
 
+from typing import Dict, List, Optional
+from lightbulb import Plugin
+from handlers.database_handler import DatabaseHandler
 from objects.user import User
 
 tracking_queue: Dict[str, User] = {}
@@ -93,6 +92,20 @@ async def get_leaderboard_members_and_time(guild_id: int) -> tuple[Optional[List
         return await db_handler.get_leaderboard_members_and_time_from_database(guild_id)
     else:
         return None, None
+    
+
+async def reset_all(guild_id: int) -> None:
+    if db_handler is not None:
+        await db_handler.reset_all_database(guild_id)
+
+async def if_member_has_permission(guild_id: int, member: hikari.Member, permission: hikari.Permissions) -> bool:
+    # author_member = await ctx.bot.rest.fetch_member(ctx.guild_id, ctx.author.id)
+    member_permission: hikari.Permissions = lightbulb.utils.permissions_for(member)
+    if permission in member_permission:
+        return True
+    else:
+        return False
+
 
 @staticmethod
 def seconds_to_timestamp(seconds: int) -> str:

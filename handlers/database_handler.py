@@ -147,7 +147,7 @@ class DatabaseHandler:
         try:
             if self.conn is not None:
                 async with self.conn.execute(
-                    "SELECT userID, time FROM stats WHERE serverID = ? ORDER BY time DESC LIMIT 1000",
+                    "SELECT userID, time FROM stats WHERE serverID = ? ORDER BY time DESC LIMIT 500",
                     (guild_id,)
                 ) as cursor:
                     rows = await cursor.fetchall()
@@ -165,3 +165,17 @@ class DatabaseHandler:
             print(f"Database error: {e}")
             
         return users, times
+    
+
+    async def reset_all_database(self, guild_id: int) -> None:
+        sql_command = """
+        DELETE FROM stats WHERE serverID = ?;
+        """
+        try:
+            if self.conn is not None:
+                await self.conn.execute(sql_command, (guild_id,))
+                await self.conn.commit()
+            else:
+                print(DATABASE_NOT_CONNECTED_MESSAGE)
+        except aiosqlite.Error as error:
+            print(f"Error inserting data: {error}")
