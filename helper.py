@@ -75,6 +75,8 @@ async def save_tracking_stats_bulk() -> None:
 
         # Make sure to update the time delta once saving
         current_user.set_joined_time(int(time.time()))
+        
+        # print(f"Saving stats for {current_user.get_user_id()} in {current_user.get_guild_id()} with time {time_difference}")
 
     if db_handler is not None:
         await db_handler.bulk_insert(user_ids, time_differences, server_ids)
@@ -98,6 +100,10 @@ async def reset_all(guild_id: int) -> None:
     if db_handler is not None:
         await db_handler.reset_all_database(guild_id)
 
+async def reset_user(guild_id: int, user_id: int) -> None:
+    if db_handler is not None:
+        await db_handler.reset_specific_user_database(guild_id, user_id)
+
 async def if_member_has_permission(guild_id: int, member: hikari.Member, permission: hikari.Permissions) -> bool:
     # author_member = await ctx.bot.rest.fetch_member(ctx.guild_id, ctx.author.id)
     member_permission: hikari.Permissions = lightbulb.utils.permissions_for(member)
@@ -113,8 +119,8 @@ def seconds_to_timestamp(seconds: int) -> str:
     hours = seconds // 3600
     minutes = (seconds % 3600) // 60
     seconds = seconds % 60
-    # return f"{hours:,}h {minutes}m {seconds}s"
-    return f"{hours:,}h {minutes}m"
+    return f"{hours:,}h {minutes}m {seconds}s"
+    # return f"{hours:,}h {minutes}m"
 
 @staticmethod
 def make_key(user_id: int, guild_id: int) -> str:

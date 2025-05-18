@@ -3,7 +3,7 @@ import hikari
 import lightbulb
 import asyncio
 
-from helper import initialize, save_tracking_stats_single, uninitialize, get_tracking_queue, make_key, start_tracking_user
+from helper import initialize, save_tracking_stats_single, uninitialize, get_tracking_queue, make_key, start_tracking_user, save_tracking_stats_bulk
 from typing import Dict, List, Mapping, Optional
 
 from objects.user import User
@@ -27,6 +27,7 @@ async def on_starting(event: hikari.StartingEvent) -> None:
     bot.load_extensions("commands.command_donate")
     bot.load_extensions("commands.command_leaderboard")
     bot.load_extensions("commands.command_reset_stats")
+    bot.load_extensions("commands.command_reset_user_stats")
 
 # After bot has fully started
 @bot.listen(hikari.StartedEvent)
@@ -43,6 +44,7 @@ async def on_started(event: hikari.StartedEvent) -> None:
 # Function when the bot is shutting down
 @bot.listen(hikari.StoppingEvent)
 async def on_stopping(event: hikari.StoppingEvent) -> None:
+    await save_tracking_stats_bulk()
     await uninitialize()
     print("Bot shutting down")
 

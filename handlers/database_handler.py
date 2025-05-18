@@ -179,3 +179,16 @@ class DatabaseHandler:
                 print(DATABASE_NOT_CONNECTED_MESSAGE)
         except aiosqlite.Error as error:
             print(f"Error inserting data: {error}")
+
+    async def reset_specific_user_database(self, guild_id: int, user_id: int) -> None:
+        sql_command = """
+        UPDATE stats SET time = 0 WHERE serverID = ? AND userID = ?;
+        """
+        try:
+            if self.conn is not None:
+                await self.conn.execute(sql_command, (guild_id,user_id))
+                await self.conn.commit()
+            else:
+                print(DATABASE_NOT_CONNECTED_MESSAGE)
+        except aiosqlite.Error as error:
+            print(f"Error inserting data: {error}")
