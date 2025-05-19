@@ -11,7 +11,7 @@ from logging_stuff import fetch_stats
 # Initialize the bot - NEW SYNTAX for Lightbulb 2.x
 bot = lightbulb.BotApp(
     token=config.BOT_TOKEN,
-    intents=hikari.Intents.ALL  # Adjust intents as needed
+    # intents=hikari.Intents.ALL
 )
 
 # Function when the bot is starting up
