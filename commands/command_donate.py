@@ -1,6 +1,8 @@
-from textwrap import dedent
 import hikari
 import lightbulb
+
+from logging_stuff import increment_donate_used
+from textwrap import dedent
 
 plugin = lightbulb.Plugin("command_donate")
 
@@ -20,6 +22,7 @@ async def status_command(e: lightbulb.Context) -> None:
         message,
         flags=hikari.MessageFlag.EPHEMERAL
         )
+    increment_donate_used()
     
 
 

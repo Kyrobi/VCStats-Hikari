@@ -5,9 +5,8 @@ import asyncio
 
 from helper import initialize, save_tracking_stats_single, uninitialize, get_tracking_queue, make_key, start_tracking_user, save_tracking_stats_bulk
 from typing import Dict, List, Mapping, Optional
-
 from objects.user import User
-
+from logging_stuff import fetch_stats
 
 # Initialize the bot - NEW SYNTAX for Lightbulb 2.x
 bot = lightbulb.BotApp(
@@ -39,6 +38,8 @@ async def on_started(event: hikari.StartedEvent) -> None:
     print(f"Initialized tracking for {len(get_tracking_queue())} users already in voice channels")
 
     asyncio.create_task(queue_updater(60 * 60 * 1)) # Runs every 1 hour
+    asyncio.create_task(auto_save_all(60 * 5)) # Runs every 5 minutes
+    asyncio.create_task(get_stats(60 * 60 * 24)) # Runs every 24 hours
 
 
 # Function when the bot is shutting down
@@ -53,6 +54,8 @@ async def on_stopping(event: hikari.StoppingEvent) -> None:
 @bot.listen(hikari.GuildAvailableEvent)
 async def on_guild_available(event: hikari.GuildAvailableEvent) -> None:
 
+
+
     # Actually returns a mapping of user IDs to their voice channels.
     # So it doesn't return all the voice channel, but all the users that are in the voice channels
     voice_states: Mapping[hikari.Snowflake, hikari.VoiceState] = event.guild.get_voice_states()
@@ -63,6 +66,16 @@ async def on_guild_available(event: hikari.GuildAvailableEvent) -> None:
         if dict_key not in get_tracking_queue():
             await start_tracking_user(user_id, event.guild_id)
             print(f"{user_voice_state.member} added to tracking queue on startup...")
+
+
+async def auto_save_all(interval_seconds: int) -> None:
+    await save_tracking_stats_bulk()
+    await asyncio.sleep(interval_seconds)
+
+
+async def get_stats(interval_seconds: int) -> None:
+    stats: str = await fetch_stats()
+    await bot.rest.create_message(1157849921802752070, stats)
 
 
 async def queue_updater(interval_seconds: int) -> None:

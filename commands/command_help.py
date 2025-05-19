@@ -1,5 +1,7 @@
-from textwrap import dedent
 import lightbulb
+
+from textwrap import dedent
+from logging_stuff import increment_help_used
 
 plugin = lightbulb.Plugin("command_stats")
 
@@ -10,6 +12,7 @@ async def status_command(e: lightbulb.Context) -> None:
         # If bot tries to run commands, nothing will happen
     if e.member and e.member.is_bot:
         return
+    increment_help_used()
     await e.respond(get_message())
     
     

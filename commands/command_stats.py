@@ -3,6 +3,7 @@ import lightbulb
 from typing import Dict, Optional
 from helper import get_tracking_queue, get_user_time_and_leaderboard_position, make_key, save_tracking_stats_single, seconds_to_timestamp
 from objects.user import User
+from logging_stuff import increment_stats_used
 
 plugin = lightbulb.Plugin("command_stats")
 user_tracker: Dict[str, User] = get_tracking_queue()
@@ -29,6 +30,8 @@ async def status_command(e: lightbulb.Context) -> None:
     if guild_id is None:
         await e.respond("This command can only be used inside a server")
         return
+    
+    increment_stats_used()
     
     # If the user is actively in the VC, we add onto the time in the database
     dict_key = make_key(user_id, guild_id)

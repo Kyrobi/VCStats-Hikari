@@ -81,18 +81,20 @@ class DatabaseHandler:
     async def bulk_insert(self, user_ids: List[int], time_differences: List[int], server_ids: List[int]):
         try:
             if self.conn is not None:
-                for user_id, time, server_id in zip(user_ids, time_differences, server_ids):
-                    await self.conn.execute("""
-                    INSERT INTO stats (userID, serverID, time) 
-                    VALUES (?, ?, ?) 
-                    ON CONFLICT(userID, serverID) 
-                    DO UPDATE SET time = time + ?;
-                    """, (user_id, server_id, time, time))
+                async with self.conn.execute("BEGIN"):  # Enables bulk transaction
+                    for user_id, time_diff, server_id in zip(user_ids, time_differences, server_ids):
+                        await self.conn.execute("""
+                            INSERT INTO stats (userID, serverID, time) 
+                            VALUES (?, ?, ?) 
+                            ON CONFLICT(userID, serverID) 
+                            DO UPDATE SET time = time + ?;
+                        """, (user_id, server_id, time_diff, time_diff))
                 await self.conn.commit()
             else:
                 print(DATABASE_NOT_CONNECTED_MESSAGE)
         except aiosqlite.Error as error:
             print(f"Error performing bulk insert: {error}")
+
 
 
     async def get_user_time(self, user_id: int, server_id: int) -> Optional[int]:

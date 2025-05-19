@@ -4,6 +4,7 @@ import lightbulb
 from typing import Optional
 from hikari import Member
 from helper import if_member_has_permission, reset_all
+from logging_stuff import increment_reset_all_used
 
 plugin = lightbulb.Plugin("command_reset_all")
 
@@ -45,6 +46,7 @@ async def status_command(e: lightbulb.Context) -> None:
             
             await reset_all(current_guild_id)
             await e.respond("Everyone's stats got reset!")
+            increment_reset_all_used()
 
         except ValueError:
             await e.respond("This is not a valid server ID.")

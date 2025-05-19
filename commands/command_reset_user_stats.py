@@ -4,6 +4,7 @@ import lightbulb
 from typing import Optional
 from hikari import Member
 from helper import if_member_has_permission, reset_user
+from logging_stuff import increment_reset_user_used
 
 plugin = lightbulb.Plugin("command_reset_user")
 
@@ -45,6 +46,7 @@ async def status_command(e: lightbulb.Context) -> None:
 
             await reset_user(current_guild_id, int(member_to_reset))
             await e.respond(f"{user.mention}'s stats got reset!")
+            increment_reset_user_used()
 
         except hikari.NotFoundError:
             await e.respond("User does not exist.")

@@ -3,6 +3,7 @@ import hikari
 
 from typing import Dict, Optional
 from helper import get_tracking_queue, make_key, save_tracking_stats_single, start_tracking_user
+from logging_stuff import increment_member_join, increment_member_left, increment_member_move
 from objects.user import User
 
 
@@ -50,11 +51,13 @@ async def on_voice_event(e: hikari.VoiceStateUpdateEvent):
 
 async def handle_join(voice_state: hikari.VoiceState):
     print("Joined channel")
+    increment_member_join()
     await start_tracking_user(voice_state.user_id, voice_state.guild_id)
 
 
 async def handle_leave(voice_state: hikari.VoiceState):
     print("Left channel")
+    increment_member_left()
 
     # After saving, remove the user from the dictionary to clean up
     user_id = voice_state.user_id
@@ -72,6 +75,7 @@ async def handle_switch(old_voice_state: hikari.VoiceState, new_voice_state: hik
 
     # This function will effectively only be used for logging purposes
     print(f"Switched channel")
+    increment_member_move()
 
 
 # REQUIRED FUNCTION - Lightbulb looks for this

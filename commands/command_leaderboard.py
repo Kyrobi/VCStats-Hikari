@@ -2,6 +2,7 @@ from typing import List, Optional
 
 import hikari
 from helper import seconds_to_timestamp, get_leaderboard_members_and_time
+from logging_stuff import increment_leaderboard_used
 import lightbulb
 
 plugin = lightbulb.Plugin("command_leaderboard")
@@ -36,6 +37,8 @@ async def leaderboard_command(e: lightbulb.Context) -> None:
 
     if all_members is None or all_times is None:
         return
+    
+    increment_leaderboard_used()
 
     # Validate requested page
     pages_possible = max(1, (len(all_members) + name_interval - 1) // name_interval)
