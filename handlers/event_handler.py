@@ -50,13 +50,12 @@ async def on_voice_event(e: hikari.VoiceStateUpdateEvent):
 
 
 async def handle_join(voice_state: hikari.VoiceState):
-    print("Joined channel")
+    # print(f"{voice_state.member} joined channel")
     increment_member_join()
     await start_tracking_user(voice_state.user_id, voice_state.guild_id)
 
 
 async def handle_leave(voice_state: hikari.VoiceState):
-    print("Left channel")
     increment_member_left()
 
     # After saving, remove the user from the dictionary to clean up
@@ -74,7 +73,7 @@ async def handle_switch(old_voice_state: hikari.VoiceState, new_voice_state: hik
     # Because of this, we only really care about if the user leaves.
 
     # This function will effectively only be used for logging purposes
-    print(f"Switched channel")
+    # print(f"{new_voice_state.member} switched channel")
     increment_member_move()
 
 

@@ -62,7 +62,7 @@ def increment_donate_used() -> None:
     global donateUsed
     donateUsed += 1
 
-async def fetch_stats() -> str:
+async def fetch_stats(bot: Optional[BotApp]) -> str:
 
     if bot is None:
         return "Error"

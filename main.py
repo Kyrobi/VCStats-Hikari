@@ -65,7 +65,7 @@ async def on_guild_available(event: hikari.GuildAvailableEvent) -> None:
         
         if dict_key not in get_tracking_queue():
             await start_tracking_user(user_id, event.guild_id)
-            print(f"{user_voice_state.member} added to tracking queue on startup...")
+            # print(f"{user_voice_state.member} added to tracking queue on startup...")
 
 
 async def auto_save_all(interval_seconds: int) -> None:
@@ -74,7 +74,7 @@ async def auto_save_all(interval_seconds: int) -> None:
 
 
 async def get_stats(interval_seconds: int) -> None:
-    stats: str = await fetch_stats()
+    stats: str = await fetch_stats(bot)
     await bot.rest.create_message(1157849921802752070, stats)
 
 
