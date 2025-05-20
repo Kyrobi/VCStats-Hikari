@@ -1,9 +1,16 @@
+import hikari
+
 from textwrap import dedent
-from typing import Optional
-
+from typing import Dict, Optional
 from lightbulb import BotApp
+import lightbulb
 
-bot: Optional[BotApp] = None
+from helper import get_tracking_queue
+
+plugin = lightbulb.Plugin("logging")
+
+shard_guild_counter: Dict[int, int] = {}
+total_guild_count: int = 0
 
 totalTimesJoined: int = 0
 totalTimesLeft: int = 0
@@ -62,6 +69,29 @@ def increment_donate_used() -> None:
     global donateUsed
     donateUsed += 1
 
+@plugin.listener(hikari.ShardReadyEvent)
+async def reset_guild_counter(event: hikari.ShardReadyEvent) -> None:
+    global total_guild_count
+    old_shard_guild_count = shard_guild_counter.get(event.shard.id, 0)
+    new_shard_guild_count = len(event.unavailable_guilds)
+
+    shard_guild_counter[event.shard.id] = new_shard_guild_count
+    total_guild_count += new_shard_guild_count - old_shard_guild_count
+
+
+@plugin.listener(hikari.GuildJoinEvent)
+async def increment_guild_counter(event: hikari.GuildJoinEvent) -> None:
+    global total_guild_count
+    shard_guild_counter[event.shard.id] += 1
+    total_guild_count += 1
+
+
+@plugin.listener(hikari.GuildLeaveEvent)
+async def decrement_guild_counter(event: hikari.GuildLeaveEvent) -> None:
+    global total_guild_count
+    shard_guild_counter[event.shard.id] -= 1
+    total_guild_count -= 1
+
 async def fetch_stats(bot: Optional[BotApp]) -> str:
 
     if bot is None:
@@ -77,56 +107,34 @@ async def fetch_stats(bot: Optional[BotApp]) -> str:
     global resetAllUsed
     global resetUserUsed
     global donateUsed
-    
-    totalServers: int = 0
-    totalMembers: int = 0
-    totalMembersInVC : int = 0
 
-    for i in bot.cache.get_available_guilds_view():
-        totalServers += 1
-        totalMembers += len(bot.cache.get_members_view_for_guild(i))
-        totalMembersInVC += len(bot.cache.get_voice_states_view_for_guild(i))
 
     shard_count: int = 0
     shard_count = bot.shard_count
 
     shard_message: str = ""
-    guilds_per_shard = {}
-    # Loop through all guilds and count them for each shard
-    for guild_id, guild in bot.cache.get_guilds_view().items():
-        # Calculate which shard this guild belongs to
-        shard_id = (guild_id >> 22) % bot.shard_count
-        
-        # Increment the count for this shard
-        if shard_id not in guilds_per_shard:
-            guilds_per_shard[shard_id] = 0
-        guilds_per_shard[shard_id] += 1
-
-    # Now output the information
-    for id, shard_gateway in bot.shards.items():
-        guild_count: int = guilds_per_shard.get(id, 0) # type: ignore
-        shard_message += f"Shard ID: {id} - Guilds: {guild_count}\n"
+    for k, v in shard_guild_counter.items():
+        shard_message += f"Shard ID: {k} - Guilds: {v}\n"
     
     message = dedent(f"""
-    **Last 24 hours**:
-    ```
-    Total servers the bot is in: {totalServers}
-    Total members in all servers: {totalMembers}
-    Total members in VC at the moment: {totalMembersInVC}
-    ==========
-    Total times joined: {totalTimesJoined}
-    Total times left: {totalTimesLeft}
-    Total times moved: {totalTimesMoved}
-    ==========
-    /donate used: {donateUsed}
-    /resetall used: {resetAllUsed}
-    /resetuser used: {resetUserUsed}
-    /help used: {helpUsed}
-    /stats used: {statsUsed}
-    /leaderboard used: {leaderboardUsed}
-    ==========
-    Total Shards: {shard_count}
-    {shard_message}
+**Last 24 hours**
+```
+Total servers: {total_guild_count}
+Total members in VC: {len(get_tracking_queue())}
+==========
+Total times joined: {totalTimesJoined}
+Total times left: {totalTimesLeft}
+Total times moved: {totalTimesMoved}
+==========
+/donate used: {donateUsed}
+/resetall used: {resetAllUsed}
+/resetuser used: {resetUserUsed}
+/help used: {helpUsed}
+/stats used: {statsUsed}
+/leaderboard used: {leaderboardUsed}
+==========
+Total Shards: {shard_count}
+{shard_message}
     ```
     """).strip()
 
@@ -143,6 +151,5 @@ async def fetch_stats(bot: Optional[BotApp]) -> str:
 
     return message
 
-def start_logging(botInstance: BotApp) -> None:
-    global bot
-    bot = botInstance
+def load(bot: lightbulb.BotApp) -> None:
+    bot.add_plugin(plugin)

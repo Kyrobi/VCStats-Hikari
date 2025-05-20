@@ -27,6 +27,7 @@ async def on_starting(event: hikari.StartingEvent) -> None:
     bot.load_extensions("commands.command_leaderboard")
     bot.load_extensions("commands.command_reset_stats")
     bot.load_extensions("commands.command_reset_user_stats")
+    bot.load_extensions("logging_stuff")
 
 # After bot has fully started
 @bot.listen(hikari.StartedEvent)
@@ -54,8 +55,6 @@ async def on_stopping(event: hikari.StoppingEvent) -> None:
 @bot.listen(hikari.GuildAvailableEvent)
 async def on_guild_available(event: hikari.GuildAvailableEvent) -> None:
 
-
-
     # Actually returns a mapping of user IDs to their voice channels.
     # So it doesn't return all the voice channel, but all the users that are in the voice channels
     voice_states: Mapping[hikari.Snowflake, hikari.VoiceState] = event.guild.get_voice_states()
@@ -69,13 +68,18 @@ async def on_guild_available(event: hikari.GuildAvailableEvent) -> None:
 
 
 async def auto_save_all(interval_seconds: int) -> None:
-    await save_tracking_stats_bulk()
-    await asyncio.sleep(interval_seconds)
+    while True:
+        print("Running auto_save_all")
+        await save_tracking_stats_bulk()
+        await asyncio.sleep(interval_seconds)
 
 
 async def get_stats(interval_seconds: int) -> None:
-    stats: str = await fetch_stats(bot)
-    await bot.rest.create_message(1157849921802752070, stats)
+    while True:
+        stats: str = await fetch_stats(bot)
+        await bot.rest.create_message(1157849921802752070, stats)
+
+        await asyncio.sleep(interval_seconds)
 
 
 async def queue_updater(interval_seconds: int) -> None:
