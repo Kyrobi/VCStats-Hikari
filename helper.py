@@ -1,4 +1,5 @@
 import hikari
+import hikari.permissions
 import lightbulb
 import time
 
@@ -104,10 +105,13 @@ async def reset_user(guild_id: int, user_id: int) -> None:
     if db_handler is not None:
         await db_handler.reset_specific_user_database(guild_id, user_id)
 
-async def if_member_has_permission(guild_id: int, member: hikari.Member, permission: hikari.Permissions) -> bool:
+async def if_member_has_permission(member: hikari.Member, permission: hikari.Permissions) -> bool:
     # author_member = await ctx.bot.rest.fetch_member(ctx.guild_id, ctx.author.id)
-    member_permission: hikari.Permissions = lightbulb.utils.permissions_for(member)
-    if permission in member_permission:
+    member_permissions: hikari.Permissions = lightbulb.utils.permissions_for(member)
+
+    # print(f"Permission for {member}: {member_permissions}")
+
+    if permission in member_permissions:
         return True
     else:
         return False

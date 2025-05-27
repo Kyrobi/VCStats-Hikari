@@ -32,7 +32,7 @@ async def status_command(e: lightbulb.Context) -> None:
         await e.respond("Bots cannot use this command.")
         return
     
-    if await if_member_has_permission(current_guild_id, member, hikari.Permissions.ADMINISTRATOR):
+    if await if_member_has_permission(member, hikari.Permissions.ADMINISTRATOR):
         confirmation_id: Optional[str] = e.options.guild_id if hasattr(e.options, 'guild_id') else None
 
         if confirmation_id is None:

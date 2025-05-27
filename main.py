@@ -8,10 +8,18 @@ from typing import Dict, List, Mapping, Optional
 from objects.user import User
 from logging_stuff import fetch_stats
 
+
+# Set the cache we want to enable
+cache_options = (
+    hikari.api.CacheComponents.VOICE_STATES |# Only want the cache for voice states
+    hikari.api.CacheComponents.ROLES # Required to do permission checks
+)
+
 # Initialize the bot - NEW SYNTAX for Lightbulb 2.x
 bot = lightbulb.BotApp(
     token=config.BOT_TOKEN,
     # intents=hikari.Intents.ALL
+    cache_settings=hikari.impl.CacheSettings(components=cache_options)
 )
 
 # Function when the bot is starting up
@@ -69,7 +77,7 @@ async def on_guild_available(event: hikari.GuildAvailableEvent) -> None:
 
 async def auto_save_all(interval_seconds: int) -> None:
     while True:
-        print("Running auto_save_all")
+        # print("Running auto_save_all")
         await save_tracking_stats_bulk()
         await asyncio.sleep(interval_seconds)
 

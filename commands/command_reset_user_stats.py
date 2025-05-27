@@ -32,7 +32,7 @@ async def status_command(e: lightbulb.Context) -> None:
         await e.respond("Bots cannot use this command.")
         return
     
-    if await if_member_has_permission(current_guild_id, member, hikari.Permissions.ADMINISTRATOR):
+    if await if_member_has_permission(member, hikari.Permissions.ADMINISTRATOR):
         member_to_reset: Optional[str] = e.options.user_id if hasattr(e.options, 'user_id') else None
 
         if member_to_reset is None:
