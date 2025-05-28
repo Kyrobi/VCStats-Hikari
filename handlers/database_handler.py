@@ -1,6 +1,9 @@
 import aiosqlite
 import os
+
 from typing import List, Optional
+from asyncache import cached # type: ignore
+from cachetools import TTLCache
 
 DATABASE_NOT_CONNECTED_MESSAGE = "Database is not connected..."
 
@@ -102,21 +105,21 @@ class DatabaseHandler:
 
 
 
-    async def get_user_time(self, user_id: int, server_id: int) -> Optional[int]:
-        try:
-            if self.conn is not None:
-                async with self.conn.execute(
-                    "SELECT time FROM stats WHERE userID = ? AND serverID = ?",
-                    (user_id, server_id)
-                ) as cursor:
-                    result = await cursor.fetchone()
-                    return result[0] if result else 0
-            else:
-                print(DATABASE_NOT_CONNECTED_MESSAGE)
-                return None
-        except aiosqlite.Error as error:
-            print(f"Error fetching time: {error}")
-            return None
+    # async def get_user_time(self, user_id: int, server_id: int) -> Optional[int]:
+    #     try:
+    #         if self.conn is not None:
+    #             async with self.conn.execute(
+    #                 "SELECT time FROM stats WHERE userID = ? AND serverID = ?",
+    #                 (user_id, server_id)
+    #             ) as cursor:
+    #                 result = await cursor.fetchone()
+    #                 return result[0] if result else 0
+    #         else:
+    #             print(DATABASE_NOT_CONNECTED_MESSAGE)
+    #             return None
+    #     except aiosqlite.Error as error:
+    #         print(f"Error fetching time: {error}")
+    #         return None
         
 
     async def get_user_time_and_position(self, user_id: int, server_id: int) -> tuple[int, Optional[int]]:
@@ -147,6 +150,8 @@ class DatabaseHandler:
             return (0, None)
         
 
+    cache = TTLCache(maxsize=500, ttl=60 * 60) # type: ignore
+    @cached(cache) # type: ignore
     async def get_leaderboard_members_and_time_from_database(self, guild_id: int) -> tuple[list[int], list[int]]:
         users: List[int] = []
         times: List[int] = []

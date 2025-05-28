@@ -3,7 +3,7 @@ import hikari.permissions
 import lightbulb
 import time
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from lightbulb import Plugin
 from handlers.database_handler import DatabaseHandler
 from objects.user import User
@@ -11,6 +11,8 @@ from objects.user import User
 tracking_queue: Dict[str, User] = {}
 db_handler: Optional[DatabaseHandler] = None
 bot_instance = None
+
+PERFORMANCE_LOGGING_CHANNEL = 1377200295389565020
 
 async def initialize(bot: lightbulb.BotApp):
 
@@ -26,11 +28,12 @@ async def uninitialize():
     if db_handler is not None:
         await db_handler.uninitialize()
 
-async def log_info_to_channel(client: Plugin, channel_id: int, message: str) -> None:
-    await client.app.rest.create_message(
-            channel_id,
-            message
-        )
+async def log_info_to_channel(channel_id: int, message: str) -> None:
+    if bot_instance is not None:
+        await bot_instance.rest.create_message(
+                channel_id,
+                message
+            )
     
 def get_tracking_queue() -> Dict[str, User]:
     return tracking_queue
@@ -56,7 +59,13 @@ async def save_tracking_stats_single(user_id1: int, guild_id1: int) -> None:
     # Save the time, and then update the time to current so that
     # the difference calculation doesn't break
     if db_handler is not None:
+
+        start = time.perf_counter()
         await db_handler.insert(user_id, time_difference, guild_id)
+        end = time.perf_counter()
+        elapsed_ms = (end - start) * 1000
+        await log_info_to_channel(1377205400981602334,f"`insert` completed in {elapsed_ms:.3f}ms")
+
         user_from_tracking_queue.set_joined_time(int(time.time()))
 
 
@@ -80,30 +89,58 @@ async def save_tracking_stats_bulk() -> None:
         # print(f"Saving stats for {current_user.get_user_id()} in {current_user.get_guild_id()} with time {time_difference}")
 
     if db_handler is not None:
+        start = time.perf_counter()
         await db_handler.bulk_insert(user_ids, time_differences, server_ids)
+        end = time.perf_counter()
+        elapsed_ms = (end - start) * 1000
+        await log_info_to_channel(PERFORMANCE_LOGGING_CHANNEL,f"`bulk_insert` completed in {elapsed_ms:.3f}ms")
 
 
-async def get_user_time_and_leaderboard_position(user_id: int, guild_id: int) -> tuple[Optional[int], Optional[int]]:
+async def get_user_time_and_leaderboard_position(user_id: int, guild_id: int) -> Tuple[Optional[int], Optional[int]]:
     if db_handler is not None:
-        return await db_handler.get_user_time_and_position(user_id, guild_id)
+
+        start = time.perf_counter()
+        result = await db_handler.get_user_time_and_position(user_id, guild_id)
+        end = time.perf_counter()
+        elapsed_ms = (end - start) * 1000
+        await log_info_to_channel(PERFORMANCE_LOGGING_CHANNEL,f"`get_user_time_and_position` completed in {elapsed_ms:.3f}ms")
+
+        return result
     else:
         return None, None
 
 
 async def get_leaderboard_members_and_time(guild_id: int) -> tuple[Optional[List[int]], Optional[List[int]]]:
     if db_handler is not None:
-        return await db_handler.get_leaderboard_members_and_time_from_database(guild_id)
+
+        start = time.perf_counter()
+        result = await db_handler.get_leaderboard_members_and_time_from_database(guild_id)
+        end = time.perf_counter()
+        elapsed_ms = (end - start) * 1000
+        await log_info_to_channel(PERFORMANCE_LOGGING_CHANNEL,f"`get_leaderboard_members_and_time_from_database` completed in {elapsed_ms:.3f}ms")
+
+        return result
     else:
         return None, None
     
 
 async def reset_all(guild_id: int) -> None:
     if db_handler is not None:
+
+        start = time.perf_counter()
         await db_handler.reset_all_database(guild_id)
+        end = time.perf_counter()
+        elapsed_ms = (end - start) * 1000
+        await log_info_to_channel(PERFORMANCE_LOGGING_CHANNEL,f"`reset_all_database` completed in {elapsed_ms:.3f}ms")
 
 async def reset_user(guild_id: int, user_id: int) -> None:
     if db_handler is not None:
+
+        start = time.perf_counter()
         await db_handler.reset_specific_user_database(guild_id, user_id)
+        end = time.perf_counter()
+        elapsed_ms = (end - start) * 1000
+        await log_info_to_channel(PERFORMANCE_LOGGING_CHANNEL,f"`reset_specific_user_database` completed in {elapsed_ms:.3f}ms")
 
 async def if_member_has_permission(member: hikari.Member, permission: hikari.Permissions) -> bool:
     # author_member = await ctx.bot.rest.fetch_member(ctx.guild_id, ctx.author.id)
