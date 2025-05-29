@@ -51,11 +51,21 @@ async def on_voice_event(e: hikari.VoiceStateUpdateEvent):
 
 async def handle_join(voice_state: hikari.VoiceState):
     # print(f"{voice_state.member} joined channel")
+
+    if voice_state.member is not None:
+        if voice_state.member.is_bot:
+            return
+
     increment_member_join()
     await start_tracking_user(voice_state.user_id, voice_state.guild_id)
 
 
 async def handle_leave(voice_state: hikari.VoiceState):
+    
+    if voice_state.member is not None:
+        if voice_state.member.is_bot:
+            return
+    
     increment_member_left()
 
     # After saving, remove the user from the dictionary to clean up
