@@ -1,16 +1,19 @@
 import hikari
-import hikari.permissions
 import lightbulb
 import time
 
 from typing import Dict, List, Optional, Tuple
-from lightbulb import Plugin
 from handlers.database_handler import DatabaseHandler
 from objects.user import User
+from asyncache import cached # type: ignore
+from cachetools import TTLCache
 
 tracking_queue: Dict[str, User] = {}
 db_handler: Optional[DatabaseHandler] = None
 bot_instance = None
+
+# Dict[Tuple[int, int], int] -> guildID, userID, position
+user_leaderboard_position_cache: TTLCache[tuple[int, int], int] = TTLCache(maxsize=10_000, ttl=60 * 60) # type: ignore
 
 PERFORMANCE_LOGGING_CHANNEL = 1377200295389565020
 
@@ -103,15 +106,31 @@ async def save_tracking_stats_bulk() -> None:
 
 
 async def get_user_time_and_leaderboard_position(user_id: int, guild_id: int) -> Tuple[Optional[int], Optional[int]]:
+    """
+    Returns [time, position]
+    """
     if db_handler is not None:
 
         start = time.perf_counter()
-        result = await db_handler.get_user_time_and_position(user_id, guild_id)
+
+        user_time = 0
+        position = 0
+
+        # If the position is in cache, we fetch the position in cache.
+        # If it is not in the cache, we use the more expensive call the obtain the position
+        if (guild_id, user_id) in user_leaderboard_position_cache:
+            user_time = await db_handler.get_user_time(user_id, guild_id)
+            position = user_leaderboard_position_cache[(guild_id, user_id)]
+        else:
+            user_time, position = await db_handler.get_user_time_and_position(user_id, guild_id)
+            if position is not None:
+                user_leaderboard_position_cache[(guild_id, user_id)] = position
+
         end = time.perf_counter()
         elapsed_ms = (end - start) * 1000
         await log_info_to_channel(PERFORMANCE_LOGGING_CHANNEL,f"`get_user_time_and_position` completed in {elapsed_ms:.3f}ms")
 
-        return result
+        return (user_time, position)
     else:
         return None, None
 

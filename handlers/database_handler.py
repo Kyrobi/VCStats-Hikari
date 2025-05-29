@@ -108,24 +108,22 @@ class DatabaseHandler:
 
 
 
-    # async def get_user_time(self, user_id: int, server_id: int) -> Optional[int]:
-    #     try:
-    #         if self.conn is not None:
-    #             async with self.conn.execute(
-    #                 "SELECT time FROM stats WHERE userID = ? AND serverID = ?",
-    #                 (user_id, server_id)
-    #             ) as cursor:
-    #                 result = await cursor.fetchone()
-    #                 return result[0] if result else 0
-    #         else:
-    #             print(DATABASE_NOT_CONNECTED_MESSAGE)
-    #             return None
-    #     except aiosqlite.Error as error:
-    #         print(f"Error fetching time: {error}")
-    #         return None
+    async def get_user_time(self, user_id: int, server_id: int) -> Optional[int]:
+        try:
+            if self.conn is not None:
+                async with self.conn.execute(
+                    "SELECT time FROM stats WHERE userID = ? AND serverID = ?",
+                    (user_id, server_id)
+                ) as cursor:
+                    result = await cursor.fetchone()
+                    return result[0] if result else 0
+            else:
+                print(DATABASE_NOT_CONNECTED_MESSAGE)
+                return None
+        except aiosqlite.Error as error:
+            print(f"Error fetching time: {error}")
+            return None
         
-    get_user_time_and_position_cache = TTLCache(maxsize=500, ttl=60 * 5) # type: ignore
-    @cached(get_user_time_and_position_cache) # type: ignore
     async def get_user_time_and_position(self, user_id: int, server_id: int) -> tuple[int, Optional[int]]:
         try:
             if self.conn is not None:
