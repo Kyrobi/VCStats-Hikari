@@ -198,7 +198,7 @@ class DatabaseHandler:
 
     async def reset_specific_user_database(self, guild_id: int, user_id: int) -> None:
         sql_command = """
-        UPDATE stats SET time = 0 WHERE serverID = ? AND userID = ?;
+        DELETE FROM stats WHERE serverID = ? AND userID = ?;
         """
         try:
             if self.conn is not None:
