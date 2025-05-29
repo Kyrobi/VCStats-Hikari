@@ -48,10 +48,9 @@ async def status_command(e: lightbulb.Context) -> None:
         # If the user is not in the VC, just grab the time from the database
         await e.respond(
             f"{e.author.mention}\n"
-            f"Ranking: **#{leaderboard_position}** `(Updated hourly)`\n"
+            f"Ranking: **#{leaderboard_position}** `||Updated hourly||`\n"
             f"Total Time Spent: **{seconds_to_timestamp(db_total_time)}**\n\n"
-            f"`Updates every 5 minutes`",
-            user_mentions=True
+            ,user_mentions=True
         )
 
     else:

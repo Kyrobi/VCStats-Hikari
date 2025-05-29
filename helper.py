@@ -5,7 +5,6 @@ import time
 from typing import Dict, List, Optional, Tuple
 from handlers.database_handler import DatabaseHandler
 from objects.user import User
-from asyncache import cached # type: ignore
 from cachetools import TTLCache
 
 tracking_queue: Dict[str, User] = {}
