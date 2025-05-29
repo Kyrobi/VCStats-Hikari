@@ -56,6 +56,9 @@ async def save_tracking_stats_single(user_id1: int, guild_id1: int) -> None:
     time_difference: int = int(time.time() - user_from_tracking_queue.get_joined_time())
     guild_id: int = user_from_tracking_queue.get_guild_id()
 
+    if time_difference <= 0:
+        return
+
     # Save the time, and then update the time to current so that
     # the difference calculation doesn't break
     if db_handler is not None:
