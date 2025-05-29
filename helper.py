@@ -1,3 +1,4 @@
+import asyncio
 import hikari
 import lightbulb
 import time
@@ -8,6 +9,8 @@ from objects.user import User
 from cachetools import TTLCache
 
 tracking_queue: Dict[str, User] = {}
+tracking_queue_lock = asyncio.Lock()
+
 db_handler: Optional[DatabaseHandler] = None
 bot_instance = None
 
@@ -39,6 +42,9 @@ async def log_info_to_channel(channel_id: int, message: str) -> None:
     
 def get_tracking_queue() -> Dict[str, User]:
     return tracking_queue
+
+def get_tracking_queue_lock() -> asyncio.Lock:
+    return tracking_queue_lock
 
 
 async def start_tracking_user(user_id: int, guild_id: int):
@@ -79,29 +85,30 @@ async def save_tracking_stats_bulk() -> None:
     time_differences: List[int] = []
     server_ids: List[int] = []
 
-    for user in tracking_queue.values():
-        current_user: User = user
+    async with get_tracking_queue_lock():
+        for user in get_tracking_queue().values():
+            current_user: User = user
 
-        time_difference: int = int(time.time()) - current_user.get_joined_time()
+            time_difference: int = int(time.time()) - current_user.get_joined_time()
 
-        if(time_difference <= 0):
-            continue
+            if(time_difference <= 0):
+                continue
 
-        time_differences.append(time_difference)
-        user_ids.append(current_user.get_user_id())
-        server_ids.append(current_user.get_guild_id())
+            time_differences.append(time_difference)
+            user_ids.append(current_user.get_user_id())
+            server_ids.append(current_user.get_guild_id())
 
-        # Make sure to update the time delta once saving
-        current_user.set_joined_time(int(time.time()))
-        
-        # print(f"Saving stats for {current_user.get_user_id()} in {current_user.get_guild_id()} with time {time_difference}")
+            # Make sure to update the time delta once saving
+            current_user.set_joined_time(int(time.time()))
+            
+            # print(f"Saving stats for {current_user.get_user_id()} in {current_user.get_guild_id()} with time {time_difference}")
 
-    if db_handler is not None:
-        start = time.perf_counter()
-        await db_handler.bulk_insert(user_ids, time_differences, server_ids)
-        end = time.perf_counter()
-        elapsed_ms = (end - start) * 1000
-        await log_info_to_channel(PERFORMANCE_LOGGING_CHANNEL,f"`bulk_insert` completed in {elapsed_ms:.3f}ms")
+        if db_handler is not None:
+            start = time.perf_counter()
+            await db_handler.bulk_insert(user_ids, time_differences, server_ids)
+            end = time.perf_counter()
+            elapsed_ms = (end - start) * 1000
+            await log_info_to_channel(PERFORMANCE_LOGGING_CHANNEL,f"`bulk_insert` completed in {elapsed_ms:.3f}ms")
 
 
 async def get_user_time_and_leaderboard_position(user_id: int, guild_id: int) -> Tuple[Optional[int], Optional[int]]:

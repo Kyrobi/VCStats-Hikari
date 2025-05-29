@@ -3,7 +3,7 @@ import hikari
 import lightbulb
 import asyncio
 
-from helper import initialize, save_tracking_stats_single, uninitialize, get_tracking_queue, make_key, start_tracking_user, save_tracking_stats_bulk
+from helper import initialize, save_tracking_stats_single, uninitialize, get_tracking_queue, get_tracking_queue_lock, make_key, start_tracking_user, save_tracking_stats_bulk
 from typing import Dict, List, Mapping, Optional
 from objects.user import User
 from logging_stuff import fetch_stats
@@ -99,29 +99,29 @@ async def queue_updater(interval_seconds: int) -> None:
     """
     print("Starting tracking queue auto clearing scheduler")
 
-    keys_to_remove: List[str] = []
-
     while True:
         print("Running tracking queue auto clearing")
+        keys_to_remove: List[str] = []
 
-        tracking_queue: Dict[str, User] = get_tracking_queue()
+        async with get_tracking_queue_lock():
+            tracking_queue: Dict[str, User] = get_tracking_queue().copy()
 
-        for key in tracking_queue:
-            user_id, guild_id = map(int, key.split("-"))
-            # print(f"Tracking queue uid: {user_id}, gid: {guild_id}")
-            user_voice_state: Optional[hikari.VoiceState] = bot.cache.get_voice_state(guild_id, user_id)
 
-            # If the user is not in voice channel and they are still in the queue, we add it to the removal list
-            if user_voice_state is None:
-                if key in tracking_queue:
-                    keys_to_remove.append(key)
-                    await save_tracking_stats_single(user_id1=user_id, guild_id1=guild_id)
+            for key in tracking_queue:
+                user_id, guild_id = map(int, key.split("-"))
+                # print(f"Tracking queue uid: {user_id}, gid: {guild_id}")
+                user_voice_state: Optional[hikari.VoiceState] = bot.cache.get_voice_state(guild_id, user_id)
 
-        # Now remove it from the actually dictionary
-        for key in keys_to_remove:
-            tracking_queue.pop(key, None)
+                # If the user is not in voice channel and they are still in the queue, we add it to the removal list
+                if user_voice_state is None:
+                    if key in tracking_queue:
+                        keys_to_remove.append(key)
+                        await save_tracking_stats_single(user_id1=user_id, guild_id1=guild_id)
+ 
+            # Now remove it from the actual dictionary
+            for key in keys_to_remove:
+                get_tracking_queue().pop(key, None)
 
-        keys_to_remove.clear() # Clean up the memory
         await asyncio.sleep(interval_seconds)
 
 bot.run()

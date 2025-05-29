@@ -1,12 +1,10 @@
 import lightbulb
 
-from typing import Dict, Optional
+from typing import Optional
 from helper import get_tracking_queue, get_user_time_and_leaderboard_position, make_key, save_tracking_stats_single, seconds_to_timestamp
-from objects.user import User
 from logging_stuff import increment_stats_used
 
 plugin = lightbulb.Plugin("command_stats")
-user_tracker: Dict[str, User] = get_tracking_queue()
 
 @plugin.command
 @lightbulb.app_command_permissions(dm_enabled=False)
@@ -48,7 +46,7 @@ async def status_command(e: lightbulb.Context) -> None:
         # If the user is not in the VC, just grab the time from the database
         await e.respond(
             f"{e.author.mention}\n"
-            f"Ranking: **#{leaderboard_position}** `||Updated hourly||`\n"
+            f"Ranking: **#{leaderboard_position}** `Updated hourly`\n"
             f"Total Time Spent: **{seconds_to_timestamp(db_total_time)}**\n\n"
             ,user_mentions=True
         )
