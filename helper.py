@@ -79,6 +79,9 @@ async def save_tracking_stats_bulk() -> None:
 
         time_difference: int = int(time.time()) - current_user.get_joined_time()
 
+        if(time_difference <= 0):
+            continue
+
         time_differences.append(time_difference)
         user_ids.append(current_user.get_user_id())
         server_ids.append(current_user.get_guild_id())
