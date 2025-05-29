@@ -29,6 +29,9 @@ class DatabaseHandler:
         self.conn = await aiosqlite.connect(self.DATABASE_FILE_NAME)
         await self.conn.execute("PRAGMA journal_mode=WAL;")  # Improves concurrency
         await self.conn.execute("PRAGMA synchronous=NORMAL;")
+        await self.conn.execute("PRAGMA cache_size = -16384;")  # 16MB
+        await self.conn.execute("PRAGMA mmap_size = 67108864;")  # 64MB
+        await self.conn.execute("PRAGMA temp_store = MEMORY;")  # Store temps in RAM
         await self.conn.commit()
         await self.create_new_table()
 
@@ -121,7 +124,8 @@ class DatabaseHandler:
     #         print(f"Error fetching time: {error}")
     #         return None
         
-
+    get_user_time_and_position_cache = TTLCache(maxsize=500, ttl=60 * 5) # type: ignore
+    @cached(get_user_time_and_position_cache) # type: ignore
     async def get_user_time_and_position(self, user_id: int, server_id: int) -> tuple[int, Optional[int]]:
         try:
             if self.conn is not None:
@@ -150,8 +154,8 @@ class DatabaseHandler:
             return (0, None)
         
 
-    cache = TTLCache(maxsize=500, ttl=60 * 60) # type: ignore
-    @cached(cache) # type: ignore
+    get_leaderboard_members_and_time_from_database_cache = TTLCache(maxsize=500, ttl=60 * 60 * 1) # type: ignore
+    @cached(get_leaderboard_members_and_time_from_database_cache) # type: ignore
     async def get_leaderboard_members_and_time_from_database(self, guild_id: int) -> tuple[list[int], list[int]]:
         users: List[int] = []
         times: List[int] = []

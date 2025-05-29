@@ -40,29 +40,19 @@ async def status_command(e: lightbulb.Context) -> None:
     
     db_total_time, leaderboard_position = await get_user_time_and_leaderboard_position(user_id, guild_id) # Current time in the database
 
-    new_total_time: Optional[int] = None
-
     # print(f"db_total_time: {db_total_time}, leaderboard_position: {leaderboard_position}")
 
     db_total_time = 0 if db_total_time is None else db_total_time
 
     if leaderboard_position is not None:
-        # If the user is in the VC while using this command, we fetch the database time with the time delta added on
-        if new_total_time is not None:
-            await e.respond(
-                f"{e.author.mention}\n"
-                f"Leaderboard Ranking: **#{leaderboard_position}**\n"
-                f"Total Time Spent: **{seconds_to_timestamp(new_total_time)}**",
-                user_mentions=True
-            )
         # If the user is not in the VC, just grab the time from the database
-        else:
-            await e.respond(
-                f"{e.author.mention}\n"
-                f"Leaderboard Ranking: **#{leaderboard_position}**\n"
-                f"Total Time Spent: **{seconds_to_timestamp(db_total_time)}**",
-                user_mentions=True
-            )
+        await e.respond(
+            f"{e.author.mention}\n"
+            f"Leaderboard Ranking: **#{leaderboard_position}**\n"
+            f"Total Time Spent: **{seconds_to_timestamp(db_total_time)}**\n\n"
+            f"`Updates every 5 minutes`",
+            user_mentions=True
+        )
 
     else:
         await e.respond("You have never been in a voice call before on this server. Please join one to start tracking your time.")
