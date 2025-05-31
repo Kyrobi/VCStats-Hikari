@@ -7,12 +7,15 @@ from typing import List, Optional, Dict
 from objects.user import User
 from asyncache import cached # type: ignore
 from cachetools import TTLCache
-from helper import log_info_to_channel
+from helper import log_info_to_channel, make_key
 
 DATABASE_NOT_CONNECTED_MESSAGE = "Database is not connected..."
 
 tracking_queue: Dict[str, User] = {}
 tracking_queue_lock = asyncio.Lock()
+
+# Dict[Tuple[int, int], int] -> guildID, userID, position
+user_leaderboard_position_cache: TTLCache[tuple[int, int], int] = TTLCache(maxsize=10_000, ttl=60 * 60) # type: ignore
 
 # Define the connection pools
 connection_pool_0 = None
@@ -55,9 +58,14 @@ class Datastore:
         if connection_pool_1:
             connection_pool_1.disconnect()
 
+    def get_tracking_queue(self) -> Dict[str, User]:
+        return tracking_queue
+
+    def get_tracking_queue_lock(self) -> asyncio.Lock:
+        return tracking_queue_lock
+
 
     async def insert(self, user_id: int, time_difference: int, server_id: int):
-        start = time.perf_counter()
         try:
             if conn_user_stats:
                 key = str(server_id)
@@ -80,10 +88,29 @@ class Datastore:
 
         except Exception as error:
             print(f"Error inserting data: {error}")
-        end = time.perf_counter()
-        elapsed_ms = (end - start) * 1000
-        await log_info_to_channel(1377200295389565020,f"`insert` completed in {elapsed_ms:.3f}ms")
 
+    async def save_single(self, user_id1: int, guild_id1: int) -> None:
+        dict_key: str = make_key(user_id1, guild_id1)
+        user_from_tracking_queue: User = tracking_queue[dict_key]
+
+        user_id: int = user_from_tracking_queue.get_user_id()
+        time_difference: int = int(time.time() - user_from_tracking_queue.get_joined_time())
+        guild_id: int = user_from_tracking_queue.get_guild_id()
+
+        if time_difference <= 0:
+            return
+
+        # Save the time, and then update the time to current so that
+        # the difference calculation doesn't break
+        if conn_user_stats is not None:
+
+            start = time.perf_counter()
+            await self.insert(user_id, time_difference, guild_id)
+            end = time.perf_counter()
+            elapsed_ms = (end - start) * 1000
+            await log_info_to_channel(1377205400981602334,f"`insert` completed in {elapsed_ms:.3f}ms")
+
+            user_from_tracking_queue.set_joined_time(int(time.time()))
 
     async def save_all(self) -> None:
         if not conn_user_stats:
@@ -149,31 +176,36 @@ class Datastore:
         await log_info_to_channel(1377200295389565020,f"`get_user_time` completed in {elapsed_ms:.3f}ms")
         
     async def get_user_time_and_position(self, user_id: int, server_id: int) -> tuple[int, Optional[int]]:
+        
         try:
-            if self.conn is not None:
-                async with self.conn.execute("""
-                    WITH leaderboard AS (
-                        SELECT 
-                            userID, 
-                            time,
-                            ROW_NUMBER() OVER (ORDER BY time DESC) AS position
-                        FROM stats
-                        WHERE serverID = ?
-                    )
-                    SELECT 
-                        time,
-                        position
-                    FROM leaderboard
-                    WHERE userID = ?
-                """, (server_id, user_id)) as cursor:
-                    result = await cursor.fetchone()
-                    return (result[0], result[1]) if result else (0, None)
+            if conn_user_stats:
+                start = time.perf_counter()
+                # Define the key for the leaderboard sorted set
+                leaderboard_key = f"leaderboard:{server_id}"
+
+                # Get the user's time from the sorted set (zscore returns the score, i.e., time)
+                user_time = await asyncio.to_thread(conn_user_stats.zscore, leaderboard_key, str(user_id))
+
+                if user_time is None:
+                    return (0, None)  # If user doesn't have time, return default values
+
+                # Get the user's position from the sorted set (zrank returns the 0-based index)
+                user_position = await asyncio.to_thread(conn_user_stats.zrank, leaderboard_key, str(user_id))
+
+                end = time.perf_counter()
+                elapsed_ms = (end - start) * 1000
+                await log_info_to_channel(1377200295389565020,f"`reset_guild_data` completed in {elapsed_ms:.3f}ms")
+
+                # Return the time and position (position is 1-based)
+                return (int(user_time), user_position + 1 if user_position is not None else None) # type: ignore
+
             else:
                 print(DATABASE_NOT_CONNECTED_MESSAGE)
                 return (0, None)
-        except aiosqlite.Error as error:
+        except Exception as error:
             print(f"Error fetching time and position: {error}")
             return (0, None)
+        
         
 
     get_leaderboard_members_and_time_from_database_cache = TTLCache(maxsize=500, ttl=60 * 60 * 1) # type: ignore
@@ -181,26 +213,29 @@ class Datastore:
     async def get_leaderboard_members_and_time_from_database(self, guild_id: int) -> tuple[list[int], list[int]]:
         users: List[int] = []
         times: List[int] = []
-        
+        start = time.perf_counter()
         try:
-            if self.conn is not None:
-                async with self.conn.execute(
-                    "SELECT userID, time FROM stats WHERE serverID = ? ORDER BY time DESC LIMIT 500",
-                    (guild_id,)
-                ) as cursor:
-                    rows = await cursor.fetchall()
-                    
-                    for row in rows:
-                        user_id = row[0]
-                        time = row[1]
+            if conn_user_stats:
+                # Define the key for the leaderboard sorted set
+                leaderboard_key = f"leaderboard:{guild_id}"
 
-                        users.append(user_id)
-                        times.append(time)
+                # Get the top 500 users by time (scores in descending order)
+                leaderboard = await asyncio.to_thread(conn_user_stats.zrange, leaderboard_key, 0, 499, withscores=True) # type: ignore
+
+                # Loop through the leaderboard and separate the user IDs and times
+                for user_id, score in leaderboard: # type: ignore
+                    users.append(int(user_id))  # type: ignore # Convert user_id to integer
+                    times.append(int(score))    # type: ignore # Convert score (time) to integer
+
             else:
                 print(DATABASE_NOT_CONNECTED_MESSAGE)
-                        
-        except aiosqlite.Error as e:
-            print(f"Database error: {e}")
+                
+        except Exception as e:
+            print(f"Error fetching leaderboard data: {e}")
+
+        end = time.perf_counter()
+        elapsed_ms = (end - start) * 1000
+        await log_info_to_channel(1377200295389565020,f"`reset_guild_data` completed in {elapsed_ms:.3f}ms")
             
         return users, times
 
