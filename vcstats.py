@@ -3,7 +3,8 @@ import hikari
 import lightbulb
 import asyncio
 
-from helper import initialize, save_tracking_stats_single, uninitialize, get_tracking_queue, get_tracking_queue_lock, make_key, start_tracking_user, save_tracking_stats_bulk
+from helper import initialize, save_tracking_stats_single, get_tracking_queue, get_tracking_queue_lock, make_key, start_tracking_user
+from datastore import Datastore
 from typing import Dict, List, Mapping, Optional
 from objects.user import User
 from logging_stuff import fetch_stats
@@ -22,9 +23,17 @@ bot = lightbulb.BotApp(
     cache_settings=hikari.impl.CacheSettings(components=cache_options)
 )
 
+datastore: Optional[Datastore] = None
+
 # Function when the bot is starting up
 @bot.listen(hikari.StartingEvent)
 async def on_starting(event: hikari.StartingEvent) -> None:
+
+    # Start the datastore first
+    global datastore
+    datastore = Datastore()
+    await datastore.initialize()
+
     # Load Eventhandlers
     bot.load_extensions("handlers.event_handler") # Handles the join and leave events
 
@@ -54,9 +63,16 @@ async def on_started(event: hikari.StartedEvent) -> None:
 # Function when the bot is shutting down
 @bot.listen(hikari.StoppingEvent)
 async def on_stopping(event: hikari.StoppingEvent) -> None:
-    await save_tracking_stats_bulk()
-    await uninitialize()
+    if datastore:
+        await datastore.save_all()
+    else:
+        print("Datastore was not available...")
+
     print("Bot shutting down")
+
+    global datastore
+    datastore = Datastore()
+    await datastore.uninitialize()
 
 
 # Adds all the existing users in the voice channel into the queue if the bot were to restart
@@ -78,7 +94,11 @@ async def on_guild_available(event: hikari.GuildAvailableEvent) -> None:
 async def auto_save_all(interval_seconds: int) -> None:
     while True:
         # print("Running auto_save_all")
-        await save_tracking_stats_bulk()
+        if datastore:
+            await datastore.save_all()
+        else:
+            print("Datastore was not available...")
+
         await asyncio.sleep(interval_seconds)
 
 

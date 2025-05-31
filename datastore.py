@@ -1,70 +1,62 @@
-import aiosqlite
-import os
+import config
+import valkey
+import asyncio
+import time
 
-from typing import List, Optional
+from typing import List, Optional, Dict
+from objects.user import User
 from asyncache import cached # type: ignore
 from cachetools import TTLCache
+from helper import log_info_to_channel
 
 DATABASE_NOT_CONNECTED_MESSAGE = "Database is not connected..."
 
-class DatabaseHandler:
+tracking_queue: Dict[str, User] = {}
+tracking_queue_lock = asyncio.Lock()
+
+# Define the connection pools
+connection_pool_0 = None
+connection_pool_1 = None
+
+# Establish the actual connections
+conn_user_stats = None
+conn_server_settings = None
+
+class Datastore:
 
     DATABASE_FILE_NAME = "database.db"
 
     # __init__ can't be async
-    def __init__(self):
-        self.conn: Optional[aiosqlite.Connection] = None
+    async def initialize(self):
+        global connection_pool_0
+        global connection_pool_1
 
-    async def init(self):
-        if not os.path.exists(self.DATABASE_FILE_NAME):
-            try:
-                with open(self.DATABASE_FILE_NAME, "w"):
-                    pass
-                print(f"File created: {self.DATABASE_FILE_NAME}")
-            except IOError as e:
-                print(f"An error occurred while creating the file: {e}")
-        # else:
-        #     print("File already exists.")
-        
-        self.conn = await aiosqlite.connect(self.DATABASE_FILE_NAME)
-        await self.conn.execute("PRAGMA journal_mode=WAL;")  # Improves concurrency
-        await self.conn.execute("PRAGMA synchronous=NORMAL;")
-        await self.conn.execute("PRAGMA cache_size = -16384;")  # 16MB
-        await self.conn.execute("PRAGMA mmap_size = 67108864;")  # 64MB
-        await self.conn.execute("PRAGMA temp_store = MEMORY;")  # Store temps in RAM
-        await self.conn.commit()
-        await self.create_new_table()
+        global conn_user_stats
+        global conn_server_settings
+
+        # Define the connection pools
+        connection_pool_0 = valkey.ConnectionPool(host=config.VALKEY_HOST, port=config.VALKEY_PORT, db=0)
+        connection_pool_1 = valkey.ConnectionPool(host=config.VALKEY_HOST, port=config.VALKEY_PORT, db=1)
+
+        # Establish the actual connections
+        conn_user_stats = valkey.Valkey(connection_pool=connection_pool_0)
+        conn_server_settings = valkey.Valkey(connection_pool=connection_pool_1)
+
 
     async def uninitialize(self):
-        if self.conn:
-            try:
-                await self.conn.commit()
-                await self.conn.close()
-                print("Database connection closed.")
-            except aiosqlite.Error as e:
-                print(f"Error closing the database connection: {e}")
-            finally:
-                self.conn = None
+        # Close the clients
+        if conn_user_stats:
+            conn_user_stats.close()
 
-    async def create_new_table(self):
-        create_stats_table = """
-        CREATE TABLE IF NOT EXISTS stats (
-            userID INTEGER NOT NULL DEFAULT 0, 
-            time INTEGER NOT NULL DEFAULT 0, 
-            serverID INTEGER NOT NULL DEFAULT 0, 
-            PRIMARY KEY (userID, serverID), 
-            UNIQUE (userID, serverID)
-        );
-        """
-        try:
-            if self.conn is not None:
-                await self.conn.execute(create_stats_table)
-                await self.conn.commit()
-            else:
-                print(DATABASE_NOT_CONNECTED_MESSAGE)
-                exit()
-        except aiosqlite.Error as error:
-            print(f"Database error: {error}")
+        if conn_server_settings:
+            conn_server_settings.close()
+
+        # Close the connection pools
+        if connection_pool_0:
+            connection_pool_0.disconnect()
+
+        if connection_pool_1:
+            connection_pool_1.disconnect()
 
 
     async def insert(self, user_id: int, time_difference: int, server_id: int):
@@ -84,27 +76,43 @@ class DatabaseHandler:
             print(f"Error inserting data: {error}")
 
 
-    async def bulk_insert(self, user_ids: List[int], time_differences: List[int], server_ids: List[int]):
-        if not self.conn:
+    async def save_all(self) -> None:
+        if not conn_user_stats:
             print(DATABASE_NOT_CONNECTED_MESSAGE)
             return
+        
+        user_ids: List[int] = []
+        time_differences: List[int] = []
+        server_ids: List[int] = []
 
-        try:
-            async with self.conn.cursor() as cursor:
-                await cursor.execute("BEGIN")
-                await cursor.executemany(
-                    """
-                    INSERT INTO stats (userID, serverID, time)
-                    VALUES (?, ?, ?)
-                    ON CONFLICT(userID, serverID)
-                    DO UPDATE SET time = time + ?;
-                    """,
-                    [(uid, sid, td, td) for uid, td, sid in zip(user_ids, time_differences, server_ids)]
-                )
-                await self.conn.commit()
-        except aiosqlite.Error as e:
-            await self.conn.rollback()
-            raise
+        async with tracking_queue_lock:
+            for user in tracking_queue.values():
+                current_user: User = user
+
+                time_difference: int = int(time.time()) - current_user.get_joined_time()
+
+                if(time_difference <= 0):
+                    continue
+
+                time_differences.append(time_difference)
+                user_ids.append(current_user.get_user_id())
+                server_ids.append(current_user.get_guild_id())
+
+                # Make sure to update the time delta once saving
+                current_user.set_joined_time(int(time.time()))
+
+        start = time.perf_counter()
+        
+        BATCH_SIZE = 1000
+        for i in range(0, len(user_ids), BATCH_SIZE):
+            pipe = conn_user_stats.pipeline(transaction=False) # type: ignore
+            for j in range(i, min(i + BATCH_SIZE, len(user_ids))):
+                pipe.hset(str(server_ids[j]), str(user_ids[j]), str(time_differences[j])) # type: ignore
+            await pipe.execute() # type: ignore
+
+        end = time.perf_counter()
+        elapsed_ms = (end - start) * 1000
+        await log_info_to_channel(1377200295389565020,f"`bulk_insert` completed in {elapsed_ms:.3f}ms")
 
 
 

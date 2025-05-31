@@ -4,14 +4,13 @@ import lightbulb
 import time
 
 from typing import Dict, List, Optional, Tuple
-from handlers.database_handler import DatabaseHandler
+from datastore import Datastore
 from objects.user import User
 from cachetools import TTLCache
 
 tracking_queue: Dict[str, User] = {}
 tracking_queue_lock = asyncio.Lock()
 
-db_handler: Optional[DatabaseHandler] = None
 bot_instance = None
 
 # Dict[Tuple[int, int], int] -> guildID, userID, position
@@ -20,18 +19,9 @@ user_leaderboard_position_cache: TTLCache[tuple[int, int], int] = TTLCache(maxsi
 PERFORMANCE_LOGGING_CHANNEL = 1377200295389565020
 
 async def initialize(bot: lightbulb.BotApp):
-
     global bot_instance
     bot_instance = bot
 
-    global db_handler
-    db_handler = DatabaseHandler()
-    await db_handler.init()
-
-async def uninitialize():
-    global db_handler
-    if db_handler is not None:
-        await db_handler.uninitialize()
 
 async def log_info_to_channel(channel_id: int, message: str) -> None:
     if bot_instance is not None:
@@ -79,36 +69,6 @@ async def save_tracking_stats_single(user_id1: int, guild_id1: int) -> None:
 
         user_from_tracking_queue.set_joined_time(int(time.time()))
 
-
-async def save_tracking_stats_bulk() -> None:
-    user_ids: List[int] = []
-    time_differences: List[int] = []
-    server_ids: List[int] = []
-
-    async with get_tracking_queue_lock():
-        for user in get_tracking_queue().values():
-            current_user: User = user
-
-            time_difference: int = int(time.time()) - current_user.get_joined_time()
-
-            if(time_difference <= 0):
-                continue
-
-            time_differences.append(time_difference)
-            user_ids.append(current_user.get_user_id())
-            server_ids.append(current_user.get_guild_id())
-
-            # Make sure to update the time delta once saving
-            current_user.set_joined_time(int(time.time()))
-            
-            # print(f"Saving stats for {current_user.get_user_id()} in {current_user.get_guild_id()} with time {time_difference}")
-
-        if db_handler is not None:
-            start = time.perf_counter()
-            await db_handler.bulk_insert(user_ids, time_differences, server_ids)
-            end = time.perf_counter()
-            elapsed_ms = (end - start) * 1000
-            await log_info_to_channel(PERFORMANCE_LOGGING_CHANNEL,f"`bulk_insert` completed in {elapsed_ms:.3f}ms")
 
 
 async def get_user_time_and_leaderboard_position(user_id: int, guild_id: int) -> Tuple[Optional[int], Optional[int]]:
@@ -183,7 +143,6 @@ async def if_member_has_permission(member: hikari.Member, permission: hikari.Per
         return True
     else:
         return False
-
 
 @staticmethod
 def seconds_to_timestamp(seconds: int) -> str:
