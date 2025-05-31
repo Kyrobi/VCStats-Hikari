@@ -24,9 +24,6 @@ conn_server_settings = None
 
 class Datastore:
 
-    DATABASE_FILE_NAME = "database.db"
-
-    # __init__ can't be async
     async def initialize(self):
         global connection_pool_0
         global connection_pool_1
@@ -60,20 +57,32 @@ class Datastore:
 
 
     async def insert(self, user_id: int, time_difference: int, server_id: int):
-        sql_command = """
-        INSERT INTO stats (userID, serverID, time) 
-        VALUES (?, ?, ?) 
-        ON CONFLICT(userID, serverID) 
-        DO UPDATE SET time = time + ?;
-        """
+        start = time.perf_counter()
         try:
-            if self.conn is not None:
-                await self.conn.execute(sql_command, (user_id, server_id, time_difference, time_difference))
-                await self.conn.commit()
+            if conn_user_stats:
+                key = str(server_id)
+                field = str(user_id)
+
+                # Get the current time value for the user from the hash
+                current_time = await asyncio.to_thread(conn_user_stats.hget, key, field)
+
+                # If the time exists, add the time difference, otherwise set it to the time_difference
+                if current_time:
+                    new_time = int(current_time) + time_difference # type: ignore
+                else:
+                    new_time = time_difference
+
+                # Set the new time in the hash
+                await asyncio.to_thread(conn_user_stats.hset, key, field, str(new_time)) # type: ignore
+
             else:
                 print(DATABASE_NOT_CONNECTED_MESSAGE)
-        except aiosqlite.Error as error:
+
+        except Exception as error:
             print(f"Error inserting data: {error}")
+        end = time.perf_counter()
+        elapsed_ms = (end - start) * 1000
+        await log_info_to_channel(1377200295389565020,f"`insert` completed in {elapsed_ms:.3f}ms")
 
 
     async def save_all(self) -> None:
@@ -108,29 +117,36 @@ class Datastore:
             pipe = conn_user_stats.pipeline(transaction=False) # type: ignore
             for j in range(i, min(i + BATCH_SIZE, len(user_ids))):
                 pipe.hset(str(server_ids[j]), str(user_ids[j]), str(time_differences[j])) # type: ignore
-            await pipe.execute() # type: ignore
+            await asyncio.to_thread(pipe.execute)
 
         end = time.perf_counter()
         elapsed_ms = (end - start) * 1000
-        await log_info_to_channel(1377200295389565020,f"`bulk_insert` completed in {elapsed_ms:.3f}ms")
-
+        await log_info_to_channel(1377200295389565020,f"`save_all` completed in {elapsed_ms:.3f}ms")
 
 
     async def get_user_time(self, user_id: int, server_id: int) -> Optional[int]:
+        start = time.perf_counter()
         try:
-            if self.conn is not None:
-                async with self.conn.execute(
-                    "SELECT time FROM stats WHERE userID = ? AND serverID = ?",
-                    (user_id, server_id)
-                ) as cursor:
-                    result = await cursor.fetchone()
-                    return result[0] if result else 0
+            if conn_user_stats:
+
+                key = str(server_id)
+                field = str(user_id)
+
+                # Use asyncio.to_thread to run the synchronous hget in a separate thread
+                result: Optional[str] = await asyncio.to_thread(conn_user_stats.hget, key, field) # type: ignore
+
+                # Return the result, defaulting to 0 if not found
+                return int(result) if result else 0
             else:
                 print(DATABASE_NOT_CONNECTED_MESSAGE)
                 return None
-        except aiosqlite.Error as error:
+        except Exception as error:  # Catch any potential errors
             print(f"Error fetching time: {error}")
             return None
+        
+        end = time.perf_counter()
+        elapsed_ms = (end - start) * 1000
+        await log_info_to_channel(1377200295389565020,f"`get_user_time` completed in {elapsed_ms:.3f}ms")
         
     async def get_user_time_and_position(self, user_id: int, server_id: int) -> tuple[int, Optional[int]]:
         try:
@@ -187,30 +203,36 @@ class Datastore:
             print(f"Database error: {e}")
             
         return users, times
-    
 
-    async def reset_all_database(self, guild_id: int) -> None:
-        sql_command = """
-        DELETE FROM stats WHERE serverID = ?;
-        """
+    async def reset_guild_data(self, guild_id: int) -> None:
+        start = time.perf_counter()
+
         try:
-            if self.conn is not None:
-                await self.conn.execute(sql_command, (guild_id,))
-                await self.conn.commit()
+            if conn_user_stats:
+                # await conn_user_stats.delete(str(guild_id))
+                await asyncio.to_thread(conn_user_stats.delete, str(guild_id))
             else:
                 print(DATABASE_NOT_CONNECTED_MESSAGE)
-        except aiosqlite.Error as error:
-            print(f"Error inserting data: {error}")
+        except Exception as error:
+            print(f"Error deleting Valkey data: {error}")
+
+        end = time.perf_counter()
+        elapsed_ms = (end - start) * 1000
+        await log_info_to_channel(1377200295389565020,f"`reset_guild_data` completed in {elapsed_ms:.3f}ms")
+
 
     async def reset_specific_user_database(self, guild_id: int, user_id: int) -> None:
-        sql_command = """
-        DELETE FROM stats WHERE serverID = ? AND userID = ?;
-        """
+        start = time.perf_counter()
+
         try:
-            if self.conn is not None:
-                await self.conn.execute(sql_command, (guild_id,user_id))
-                await self.conn.commit()
+            if conn_user_stats:
+                # conn_user_stats.hdel(str(guild_id), str(user_id))
+                await asyncio.to_thread(conn_user_stats.hdel, str(guild_id), str(user_id))
             else:
                 print(DATABASE_NOT_CONNECTED_MESSAGE)
-        except aiosqlite.Error as error:
-            print(f"Error inserting data: {error}")
+        except Exception as error:
+            print(f"Error deleting user from Valkey: {error}")
+
+        end = time.perf_counter()
+        elapsed_ms = (end - start) * 1000
+        await log_info_to_channel(1377200295389565020,f"`reset_specific_user_database` completed in {elapsed_ms:.3f}ms")

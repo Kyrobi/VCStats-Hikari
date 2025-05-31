@@ -115,24 +115,6 @@ async def get_leaderboard_members_and_time(guild_id: int) -> tuple[Optional[List
         return None, None
     
 
-async def reset_all(guild_id: int) -> None:
-    if db_handler is not None:
-
-        start = time.perf_counter()
-        await db_handler.reset_all_database(guild_id)
-        end = time.perf_counter()
-        elapsed_ms = (end - start) * 1000
-        await log_info_to_channel(PERFORMANCE_LOGGING_CHANNEL,f"`reset_all_database` completed in {elapsed_ms:.3f}ms")
-
-async def reset_user(guild_id: int, user_id: int) -> None:
-    if db_handler is not None:
-
-        start = time.perf_counter()
-        await db_handler.reset_specific_user_database(guild_id, user_id)
-        end = time.perf_counter()
-        elapsed_ms = (end - start) * 1000
-        await log_info_to_channel(PERFORMANCE_LOGGING_CHANNEL,f"`reset_specific_user_database` completed in {elapsed_ms:.3f}ms")
-
 async def if_member_has_permission(member: hikari.Member, permission: hikari.Permissions) -> bool:
     # author_member = await ctx.bot.rest.fetch_member(ctx.guild_id, ctx.author.id)
     member_permissions: hikari.Permissions = lightbulb.utils.permissions_for(member)
