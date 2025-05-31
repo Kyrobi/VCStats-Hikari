@@ -4,3 +4,4 @@ hikari-miru==4.2.0 # Hikari addon that implements component handling (i.e. modal
 psutil==7.0.0 # Gets info about the system (e.g. ram usage)
 aiosqlite>=0.21.0
 asyncache==0.3.1
+valkey[libvalkey]

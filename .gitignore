@@ -9,3 +9,4 @@ database.db-shm
 database.db-wal
 todo.txt
 /valkey
+migrate.py
