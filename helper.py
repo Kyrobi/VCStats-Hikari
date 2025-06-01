@@ -70,6 +70,10 @@ async def if_member_is_owner(guild_id: int, user_id: int) -> bool:
     else:
         print("Bot instance none")
         return False
+    
+def get_no_admin_perms_message() -> str:
+    return "You need to have administrator permission to use this command.\n\nPlease **double check** if you have it turned on.\nhttps://cdn.discordapp.com/attachments/1377503916899565689/1378845891569385482/brave_hoCo3ehPvh.png?ex=683e15ce&is=683cc44e&hm=1b2e2e5a8d16de17865f9e72265e09aa326c2d567a819631e50883deb43cdf3c&"
+                        
 
 @staticmethod
 def seconds_to_timestamp(seconds: int) -> str:

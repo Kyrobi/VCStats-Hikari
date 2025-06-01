@@ -3,7 +3,7 @@ import lightbulb
 
 from typing import Optional
 from hikari import Member
-from helper import if_member_has_permission, if_member_is_owner
+from helper import if_member_has_permission, if_member_is_owner, get_no_admin_perms_message
 from logging_stuff import increment_reset_all_used
 from datastore import Datastore
 
@@ -55,7 +55,7 @@ async def status_command(e: lightbulb.Context) -> None:
             return
 
     else:
-        await e.respond("You need to have administrator permission to use this command", flags=hikari.MessageFlag.EPHEMERAL)
+        await e.respond(get_no_admin_perms_message(),flags=hikari.MessageFlag.EPHEMERAL)
     
 
     
