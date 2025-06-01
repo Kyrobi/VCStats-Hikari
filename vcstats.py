@@ -3,7 +3,8 @@ import hikari
 import lightbulb
 import asyncio
 
-from helper import initialize, save_tracking_stats_single, uninitialize, get_tracking_queue, get_tracking_queue_lock, make_key, start_tracking_user, save_tracking_stats_bulk
+from helper import initialize, make_key, start_tracking_user
+from datastore import Datastore
 from typing import Dict, List, Mapping, Optional
 from objects.user import User
 from logging_stuff import fetch_stats
@@ -11,7 +12,7 @@ from logging_stuff import fetch_stats
 
 # Set the cache we want to enable
 cache_options = (
-    hikari.api.CacheComponents.VOICE_STATES | # Only want the cache for voice states
+    hikari.api.CacheComponents.VOICE_STATES |# Only want the cache for voice states
     hikari.api.CacheComponents.ROLES | # Required to do permission checks
     hikari.api.CacheComponents.MEMBERS # Required to retreive member information given just user_id
 )
@@ -23,9 +24,15 @@ bot = lightbulb.BotApp(
     cache_settings=hikari.impl.CacheSettings(components=cache_options)
 )
 
+datastore = Datastore()
+
 # Function when the bot is starting up
 @bot.listen(hikari.StartingEvent)
 async def on_starting(event: hikari.StartingEvent) -> None:
+
+    # Start the datastore first
+    await datastore.initialize()
+
     # Load Eventhandlers
     bot.load_extensions("handlers.event_handler") # Handles the join and leave events
 
@@ -34,7 +41,7 @@ async def on_starting(event: hikari.StartingEvent) -> None:
     bot.load_extensions("commands.command_help")
     bot.load_extensions("commands.command_donate")
     bot.load_extensions("commands.command_leaderboard")
-    bot.load_extensions("commands.command_reset_stats")
+    bot.load_extensions("commands.command_reset_guild_stats")
     bot.load_extensions("commands.command_reset_user_stats")
     bot.load_extensions("logging_stuff")
 
@@ -45,7 +52,7 @@ async def on_started(event: hikari.StartedEvent) -> None:
     await initialize(bot)
 
     # await user_tracker.add_all_users_in_voice_channels(bot)
-    print(f"Initialized tracking for {len(get_tracking_queue())} users already in voice channels")
+    print(f"Initialized tracking for {len(datastore.get_tracking_queue())} users already in voice channels")
 
     asyncio.create_task(queue_updater(60 * 60 * 1)) # Runs every 1 hour
     asyncio.create_task(auto_save_all(60 * 5)) # Runs every 5 minutes
@@ -55,9 +62,14 @@ async def on_started(event: hikari.StartedEvent) -> None:
 # Function when the bot is shutting down
 @bot.listen(hikari.StoppingEvent)
 async def on_stopping(event: hikari.StoppingEvent) -> None:
-    await save_tracking_stats_bulk()
-    await uninitialize()
+    if datastore:
+        await datastore.save_all()
+    else:
+        print("Datastore was not available...")
+
     print("Bot shutting down")
+
+    await datastore.uninitialize()
 
 
 # Adds all the existing users in the voice channel into the queue if the bot were to restart
@@ -69,14 +81,14 @@ async def on_guild_available(event: hikari.GuildAvailableEvent) -> None:
     voice_states: Mapping[hikari.Snowflake, hikari.VoiceState] = event.guild.get_voice_states()
 
     for user_id, user_voice_state in voice_states.items():
-        
+
         member: Optional[hikari.Member] = bot.cache.get_member(event.guild_id, user_id)
         if member and member.is_bot:
             continue
 
         dict_key: str = make_key(user_id, event.guild_id)
         
-        if dict_key not in get_tracking_queue():
+        if dict_key not in datastore.get_tracking_queue():
             await start_tracking_user(user_id, event.guild_id)
             # print(f"{user_voice_state.member} added to tracking queue on startup...")
 
@@ -84,7 +96,11 @@ async def on_guild_available(event: hikari.GuildAvailableEvent) -> None:
 async def auto_save_all(interval_seconds: int) -> None:
     while True:
         # print("Running auto_save_all")
-        await save_tracking_stats_bulk()
+        if datastore:
+            await datastore.save_all()
+        else:
+            print("Datastore was not available...")
+
         await asyncio.sleep(interval_seconds)
 
 
@@ -109,8 +125,8 @@ async def queue_updater(interval_seconds: int) -> None:
         print("Running tracking queue auto clearing")
         keys_to_remove: List[str] = []
 
-        async with get_tracking_queue_lock():
-            tracking_queue: Dict[str, User] = get_tracking_queue().copy()
+        async with datastore.get_tracking_queue_lock():
+            tracking_queue: Dict[str, User] = datastore.get_tracking_queue().copy()
 
 
             for key in tracking_queue:
@@ -122,11 +138,11 @@ async def queue_updater(interval_seconds: int) -> None:
                 if user_voice_state is None:
                     if key in tracking_queue:
                         keys_to_remove.append(key)
-                        await save_tracking_stats_single(user_id1=user_id, guild_id1=guild_id)
+                        await datastore.save_single(user_id1=user_id, guild_id1=guild_id)
  
             # Now remove it from the actual dictionary
             for key in keys_to_remove:
-                get_tracking_queue().pop(key, None)
+                datastore.get_tracking_queue().pop(key, None)
 
         await asyncio.sleep(interval_seconds)
 

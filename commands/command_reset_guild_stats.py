@@ -3,10 +3,12 @@ import lightbulb
 
 from typing import Optional
 from hikari import Member
-from helper import if_member_has_permission, reset_all
+from helper import if_member_has_permission
 from logging_stuff import increment_reset_all_used
+from datastore import Datastore
 
 plugin = lightbulb.Plugin("command_reset_all")
+datastore = Datastore()
 
 # This command clears the leaderboard for a server
 @plugin.command
@@ -44,7 +46,7 @@ async def status_command(e: lightbulb.Context) -> None:
                 await e.respond("This is not the correct server ID for this server.")
                 return
             
-            await reset_all(current_guild_id)
+            await datastore.reset_guild_data(current_guild_id)
             await e.respond("Everyone's stats got reset!")
             increment_reset_all_used()
 

@@ -2,11 +2,13 @@ import lightbulb
 import hikari
 
 from typing import Optional
-from helper import get_tracking_queue, get_tracking_queue_lock, make_key, save_tracking_stats_single, start_tracking_user
+from helper import make_key, start_tracking_user
 from logging_stuff import increment_member_join, increment_member_left, increment_member_move
+from datastore import Datastore
 
 
 plugin = lightbulb.Plugin("event_handler")
+datastore = Datastore()
 
 @plugin.listener(hikari.VoiceStateUpdateEvent) # type: ignore
 async def on_voice_event(e: hikari.VoiceStateUpdateEvent):
@@ -70,12 +72,12 @@ async def handle_leave(voice_state: hikari.VoiceState):
     user_id = voice_state.user_id
     guild_id = voice_state.guild_id
 
-    await save_tracking_stats_single(user_id, guild_id)
+    await datastore.save_single(user_id, guild_id)
 
     dict_key: str = make_key(user_id, guild_id)
 
-    async with get_tracking_queue_lock():
-        get_tracking_queue().pop(dict_key, None)
+    async with datastore.get_tracking_queue_lock():
+        datastore.get_tracking_queue().pop(dict_key, None)
 
 async def handle_switch(old_voice_state: hikari.VoiceState, new_voice_state: hikari.VoiceState):
     # UPDATE: We don't actually care about if the user switch channels

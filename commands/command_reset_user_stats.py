@@ -3,10 +3,12 @@ import lightbulb
 
 from typing import Optional
 from hikari import Member
-from helper import if_member_has_permission, reset_user
+from helper import if_member_has_permission
 from logging_stuff import increment_reset_user_used
+from datastore import Datastore
 
 plugin = lightbulb.Plugin("command_reset_user")
+datastore = Datastore()
 
 # This command clears the leaderboard for a server
 @plugin.command
@@ -44,7 +46,7 @@ async def status_command(e: lightbulb.Context) -> None:
         try:
             user = await plugin.bot.rest.fetch_user(int(member_to_reset))
 
-            await reset_user(current_guild_id, int(member_to_reset))
+            await datastore.reset_user_data(current_guild_id, int(member_to_reset))
             await e.respond(f"{user.mention}'s stats got reset!")
             increment_reset_user_used()
 
@@ -55,7 +57,7 @@ async def status_command(e: lightbulb.Context) -> None:
             await e.respond("Something went wrong running this command.")
             return
         except ValueError:
-            await e.respond("Invalud user ID.")
+            await e.respond("Invalid user ID.")
             return
 
     else:

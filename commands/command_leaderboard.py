@@ -1,11 +1,13 @@
-from typing import List, Optional
-
 import hikari
-from helper import seconds_to_timestamp, get_leaderboard_members_and_time
-from logging_stuff import increment_leaderboard_used
 import lightbulb
 
+from helper import seconds_to_timestamp
+from logging_stuff import increment_leaderboard_used
+from typing import List, Optional
+from datastore import Datastore
+
 plugin = lightbulb.Plugin("command_leaderboard")
+datastore = Datastore()
 
 @plugin.command
 @lightbulb.app_command_permissions(dm_enabled=False)
@@ -33,10 +35,7 @@ async def leaderboard_command(e: lightbulb.Context) -> None:
     # Get all members from the database that are associated with this guild
     all_members: Optional[List[int]]
     all_times: Optional[List[int]]
-    all_members, all_times = await get_leaderboard_members_and_time(guild_id)
-
-    if all_members is None or all_times is None:
-        return
+    all_members, all_times = await datastore.get_leaderboard_members_and_time(guild_id)
     
     increment_leaderboard_used()
 
@@ -77,7 +76,7 @@ async def leaderboard_command(e: lightbulb.Context) -> None:
     
     # Create embed
     embed = hikari.Embed(
-        title="Voice Call Leaderboard [Top 500]",
+        title="Voice Call Leaderboard [Top 200]",
         description=f"{leaderboard_content}\n\n{server_total}{result_suffix}{next_page_notice}\n\n(Leaderboard updates every hour)",
         color=0x3498db
     )
