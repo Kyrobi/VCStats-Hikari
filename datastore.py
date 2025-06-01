@@ -163,6 +163,9 @@ class Datastore:
                 result: Optional[str] = await asyncio.to_thread(conn_user_stats.hget, key, field) # type: ignore
 
                 # Return the result, defaulting to 0 if not found
+                end = time.perf_counter()
+                elapsed_ms = (end - start) * 1000
+                await log_info_to_channel(1377200295389565020,f"`get_user_time` completed in {elapsed_ms:.3f}ms")
                 return int(result) if result else 0
             else:
                 print(DATABASE_NOT_CONNECTED_MESSAGE)
@@ -171,9 +174,6 @@ class Datastore:
             print(f"Error fetching time: {error}")
             return None
         
-        end = time.perf_counter()
-        elapsed_ms = (end - start) * 1000
-        await log_info_to_channel(1377200295389565020,f"`get_user_time` completed in {elapsed_ms:.3f}ms")
         
     async def get_user_time_and_position(self, user_id: int, server_id: int) -> tuple[int, Optional[int]]:
         
@@ -194,7 +194,7 @@ class Datastore:
 
                 end = time.perf_counter()
                 elapsed_ms = (end - start) * 1000
-                await log_info_to_channel(1377200295389565020,f"`reset_guild_data` completed in {elapsed_ms:.3f}ms")
+                await log_info_to_channel(1377200295389565020,f"`get_user_time_and_position` completed in {elapsed_ms:.3f}ms")
 
                 # Return the time and position (position is 1-based)
                 return (int(user_time), user_position + 1 if user_position is not None else None) # type: ignore
@@ -208,9 +208,9 @@ class Datastore:
         
         
 
-    get_leaderboard_members_and_time_from_database_cache = TTLCache(maxsize=500, ttl=60 * 60 * 1) # type: ignore
-    @cached(get_leaderboard_members_and_time_from_database_cache) # type: ignore
-    async def get_leaderboard_members_and_time_from_database(self, guild_id: int) -> tuple[list[int], list[int]]:
+    get_leaderboard_members_and_time_cache = TTLCache(maxsize=500, ttl=60 * 60 * 1) # type: ignore
+    @cached(get_leaderboard_members_and_time_cache) # type: ignore
+    async def get_leaderboard_members_and_time(self, guild_id: int) -> tuple[list[int], list[int]]:
         users: List[int] = []
         times: List[int] = []
         start = time.perf_counter()
@@ -235,7 +235,7 @@ class Datastore:
 
         end = time.perf_counter()
         elapsed_ms = (end - start) * 1000
-        await log_info_to_channel(1377200295389565020,f"`reset_guild_data` completed in {elapsed_ms:.3f}ms")
+        await log_info_to_channel(1377200295389565020,f"`get_leaderboard_members_and_time` completed in {elapsed_ms:.3f}ms")
             
         return users, times
 
@@ -256,7 +256,7 @@ class Datastore:
         await log_info_to_channel(1377200295389565020,f"`reset_guild_data` completed in {elapsed_ms:.3f}ms")
 
 
-    async def reset_specific_user_database(self, guild_id: int, user_id: int) -> None:
+    async def reset_user_data(self, guild_id: int, user_id: int) -> None:
         start = time.perf_counter()
 
         try:
@@ -270,4 +270,4 @@ class Datastore:
 
         end = time.perf_counter()
         elapsed_ms = (end - start) * 1000
-        await log_info_to_channel(1377200295389565020,f"`reset_specific_user_database` completed in {elapsed_ms:.3f}ms")
+        await log_info_to_channel(1377200295389565020,f"`reset_specific_user` completed in {elapsed_ms:.3f}ms")
