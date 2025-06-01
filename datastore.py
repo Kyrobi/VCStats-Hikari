@@ -149,7 +149,8 @@ class Datastore:
             pipe = conn_user_stats.pipeline(transaction=False) # type: ignore
             for j in range(i, min(i + BATCH_SIZE, len(user_ids))):
                 key = f"guild:{server_ids[j]}"
-                pipe.zadd(key, {str(user_ids[j]): time_differences[j]}) # type: ignore
+                # incr=True making sure it adds to the time instead of overriding
+                pipe.zadd(key, {str(user_ids[j]): time_differences[j]}, incr=True) # type: ignore 
             await asyncio.to_thread(pipe.execute)
 
         end = time.perf_counter()
