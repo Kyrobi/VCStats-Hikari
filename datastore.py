@@ -65,31 +65,22 @@ class Datastore:
 
 
     async def insert(self, user_id: int, time_difference: int, server_id: int):
-        "Do not call this method directly. It's used by functions liked save_single()"
+        """Do not call this method directly. It's used by functions liked save_single()"""
         try:
             if conn_user_stats:
-
-                # Get the current time value for the user from the hash
-                # current_time = await asyncio.to_thread(conn_user_stats.hget, key, field)
                 key = f"guild:{server_id}"
-                current_time = await asyncio.to_thread(conn_user_stats.zscore, key, str(user_id))
-
-                # If the time exists, add the time difference, otherwise set it to the time_difference
-                if current_time:
-                    new_time = int(current_time) + time_difference # type: ignore
-                else:
-                    new_time = time_difference
-
-                # Set the new time in the hash
-                # await asyncio.to_thread(conn_user_stats.hset, key, field, str(new_time)) # type: ignore
-                # conn_user_stats.zadd(key, {str(user_id): str(new_time)})
-                await asyncio.to_thread(conn_user_stats.zadd, key, {str(user_id): str(new_time)})
-
+                await asyncio.to_thread(
+                    conn_user_stats.zadd, 
+                    key, 
+                    {str(user_id): time_difference}, 
+                    incr=True
+                )
             else:
                 print(DATABASE_NOT_CONNECTED_MESSAGE)
 
         except Exception as error:
             print(f"Error inserting data: {error}")
+
 
     async def save_single(self, user_id1: int, guild_id1: int) -> None:
         from helper import make_key
