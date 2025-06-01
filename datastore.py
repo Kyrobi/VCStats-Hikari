@@ -174,15 +174,24 @@ class Datastore:
                 # Get the user's time from the sorted set (zscore returns the score, i.e., time)
                 # user_time = await asyncio.to_thread(conn_user_stats.zscore, leaderboard_key, str(user_id))
                 key = f"guild:{server_id}"
-                user_time = await asyncio.to_thread(conn_user_stats.zscore, key, str(user_id))
+
+                pipe = conn_user_stats.pipeline(transaction=False) # type: ignore
+                pipe.zscore(key, str(user_id))
+                pipe.zrevrank(key, str(user_id))
+
+                results = await asyncio.to_thread(pipe.execute) # type: ignore
+
+                user_time = results[0] # type: ignore
+                user_position = results[1] # type: ignore
+                
+                # user_time = await asyncio.to_thread(conn_user_stats.zscore, key, str(user_id))
 
                 if user_time is None:
                     print("None user time")
                     return (0, None)  # If user doesn't have time, return default values
 
                 # Get the user's position from the sorted set (zrank returns the 0-based index)
-                # user_position = await asyncio.to_thread(conn_user_stats.zrank, leaderboard_key, str(user_id))
-                user_position = await asyncio.to_thread(conn_user_stats.zrevrank, key, str(user_id))
+                # user_position = await asyncio.to_thread(conn_user_stats.zrevrank, key, str(user_id))
                 # print(f"{user_position}")
 
                 end = time.perf_counter()
