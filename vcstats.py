@@ -13,7 +13,8 @@ from logging_stuff import fetch_stats
 # Set the cache we want to enable
 cache_options = (
     hikari.api.CacheComponents.VOICE_STATES |# Only want the cache for voice states
-    hikari.api.CacheComponents.ROLES # Required to do permission checks
+    hikari.api.CacheComponents.ROLES | # Required to do permission checks
+    hikari.api.CacheComponents.ROLES # Required to retreive member information given just user_id
 )
 
 # Initialize the bot - NEW SYNTAX for Lightbulb 2.x
@@ -82,6 +83,11 @@ async def on_guild_available(event: hikari.GuildAvailableEvent) -> None:
     voice_states: Mapping[hikari.Snowflake, hikari.VoiceState] = event.guild.get_voice_states()
 
     for user_id, user_voice_state in voice_states.items():
+
+        member: Optional[hikari.Member] = bot.cache.get_member(event.guild_id, user_id)
+        if member and member.is_bot:
+            continue
+
         dict_key: str = make_key(user_id, event.guild_id)
         
         if dict_key not in datastore.get_tracking_queue():
