@@ -211,7 +211,7 @@ class Datastore:
         
         
 
-    get_leaderboard_members_and_time_cache = TTLCache(maxsize=500, ttl=60 * 60 * 1) # type: ignore
+    get_leaderboard_members_and_time_cache = TTLCache(maxsize=500, ttl=60 * 58 * 1) # type: ignore
     @cached(get_leaderboard_members_and_time_cache) # type: ignore
     async def get_leaderboard_members_and_time(self, guild_id: int) -> tuple[list[int], list[int]]:
         users: List[int] = []

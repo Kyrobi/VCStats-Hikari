@@ -4,6 +4,7 @@ import time
 
 from datastore import Datastore
 from objects.user import User
+from typing import Optional
 
 bot_instance = None
 datastore = Datastore()
@@ -43,6 +44,31 @@ async def if_member_has_permission(member: hikari.Member, permission: hikari.Per
     if permission in member_permissions:
         return True
     else:
+        return False
+    
+async def if_member_is_owner(guild_id: int, user_id: int) -> bool:
+    if bot_instance is not None:
+
+        # Check the cache first before making an API call
+        guild: Optional[hikari.Guild] = bot_instance.cache.get_guild(guild_id)
+
+        if guild is None:
+            try:
+                guild = await bot_instance.rest.fetch_guild(guild_id)
+                
+                if guild.owner_id == user_id:
+                    return True
+                
+                else:
+                    return False
+                
+            except:
+                return False
+            
+        return False
+
+    else:
+        print("Bot instance none")
         return False
 
 @staticmethod

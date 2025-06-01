@@ -38,7 +38,6 @@ async def status_command(e: lightbulb.Context) -> None:
     if dict_key in datastore.get_tracking_queue():
         await datastore.save_single(user_id, guild_id)
     
-
     db_total_time, leaderboard_position = await datastore.get_user_time_and_position(user_id, guild_id) # Current time in the database
 
     # print(f"db_total_time: {db_total_time}, leaderboard_position: {leaderboard_position}")
@@ -46,7 +45,7 @@ async def status_command(e: lightbulb.Context) -> None:
         # If the user is not in the VC, just grab the time from the database
         await e.respond(
             f"{e.author.mention}\n"
-            f"Ranking: **#{leaderboard_position}** `Updated hourly`\n"
+            f"Ranking: **#{leaderboard_position}**\n"
             f"Total Time Spent: **{seconds_to_timestamp(db_total_time)}**\n\n"
             ,user_mentions=True
         )

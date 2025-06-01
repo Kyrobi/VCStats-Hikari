@@ -3,7 +3,7 @@ import lightbulb
 
 from typing import Optional
 from hikari import Member
-from helper import if_member_has_permission
+from helper import if_member_has_permission, if_member_is_owner
 from logging_stuff import increment_reset_user_used
 from datastore import Datastore
 
@@ -34,7 +34,7 @@ async def status_command(e: lightbulb.Context) -> None:
         await e.respond("Bots cannot use this command.")
         return
     
-    if await if_member_has_permission(member, hikari.Permissions.ADMINISTRATOR):
+    if await if_member_is_owner(guild_id=e.guild_id, user_id=member.id) or await if_member_has_permission(member, hikari.Permissions.ADMINISTRATOR):
         member_to_reset: Optional[str] = e.options.user_id if hasattr(e.options, 'user_id') else None
 
         if member_to_reset is None:
