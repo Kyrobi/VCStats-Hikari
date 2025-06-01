@@ -69,8 +69,6 @@ async def on_stopping(event: hikari.StoppingEvent) -> None:
 
     print("Bot shutting down")
 
-    global datastore
-    datastore = Datastore()
     await datastore.uninitialize()
 
 
