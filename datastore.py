@@ -235,7 +235,7 @@ class Datastore:
             if conn_user_stats:
 
                 # Get the top 500 users by time (scores in descending order)
-                leaderboard = await asyncio.to_thread(conn_user_stats.zrevrange, key, 0, 499, withscores=True) # type: ignore
+                leaderboard = await asyncio.to_thread(conn_user_stats.zrevrange, key, 0, 199, withscores=True) # type: ignore
 
                 # Loop through the leaderboard and separate the user IDs and times
                 for user_id, score in leaderboard: # type: ignore

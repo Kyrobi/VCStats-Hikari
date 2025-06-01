@@ -76,7 +76,7 @@ async def leaderboard_command(e: lightbulb.Context) -> None:
     
     # Create embed
     embed = hikari.Embed(
-        title="Voice Call Leaderboard [Top 500]",
+        title="Voice Call Leaderboard [Top 200]",
         description=f"{leaderboard_content}\n\n{server_total}{result_suffix}{next_page_notice}\n\n(Leaderboard updates every hour)",
         color=0x3498db
     )
