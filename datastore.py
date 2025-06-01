@@ -85,28 +85,33 @@ class Datastore:
     async def save_single(self, user_id1: int, guild_id1: int) -> None:
         from helper import make_key
 
-        dict_key: str = make_key(user_id1, guild_id1)
-        user_from_tracking_queue: User = tracking_queue[dict_key]
+        async with tracking_queue_lock:
+            dict_key: str = make_key(user_id1, guild_id1)
 
-        user_id: int = user_from_tracking_queue.get_user_id()
-        time_difference: int = int(time.time() - user_from_tracking_queue.get_joined_time())
-        guild_id: int = user_from_tracking_queue.get_guild_id()
+            if dict_key not in tracking_queue:
+                return
 
-        if time_difference <= 0:
-            return
+            user_from_tracking_queue: User = tracking_queue[dict_key]
 
-        # Save the time, and then update the time to current so that
-        # the difference calculation doesn't break
-        if conn_user_stats is not None:
+            user_id: int = user_from_tracking_queue.get_user_id()
+            time_difference: int = int(time.time() - user_from_tracking_queue.get_joined_time())
+            guild_id: int = user_from_tracking_queue.get_guild_id()
 
-            start = time.perf_counter()
-            await self.insert(user_id, time_difference, guild_id)
-            end = time.perf_counter()
-            elapsed_ms = (end - start) * 1000
-            from helper import log_info_to_channel
-            await log_info_to_channel(1377205400981602334,f"`insert` completed in {elapsed_ms:.3f}ms")
+            if time_difference <= 0:
+                return
 
-            user_from_tracking_queue.set_joined_time(int(time.time()))
+            # Save the time, and then update the time to current so that
+            # the difference calculation doesn't break
+            if conn_user_stats is not None:
+                try:
+                    start = time.perf_counter()
+                    await self.insert(user_id, time_difference, guild_id)
+                    end = time.perf_counter()
+                    elapsed_ms = (end - start) * 1000
+                    from helper import log_info_to_channel
+                    await log_info_to_channel(1377205400981602334,f"`insert` completed in {elapsed_ms:.3f}ms")
+                finally:
+                    user_from_tracking_queue.set_joined_time(int(time.time()))
 
     async def save_all(self) -> None:
         if not conn_user_stats:
@@ -133,16 +138,26 @@ class Datastore:
                 # Make sure to update the time delta once saving
                 current_user.set_joined_time(int(time.time()))
 
+        # Assumes there nothing to save, so don't run the rest of the code
+        if not user_ids: 
+            return
+
         start = time.perf_counter()
         
         BATCH_SIZE = 1000
         for i in range(0, len(user_ids), BATCH_SIZE):
-            pipe = conn_user_stats.pipeline(transaction=False) # type: ignore
-            for j in range(i, min(i + BATCH_SIZE, len(user_ids))):
-                key = f"guild:{server_ids[j]}"
-                # incr=True making sure it adds to the time instead of overriding
-                pipe.zadd(key, {str(user_ids[j]): time_differences[j]}, incr=True) # type: ignore 
-            await asyncio.to_thread(pipe.execute)
+            try:
+                pipe = conn_user_stats.pipeline(transaction=False) # type: ignore
+
+                for j in range(i, min(i + BATCH_SIZE, len(user_ids))):
+
+                    key = f"guild:{server_ids[j]}"
+                    pipe.zadd(key, {str(user_ids[j]): time_differences[j]}, incr=True) # type: ignore # incr=True making sure it adds to the time instead of overriding
+
+                await asyncio.to_thread(pipe.execute)
+                
+            except Exception as error:
+                print(f"Error in batch: {error}")
 
         end = time.perf_counter()
         elapsed_ms = (end - start) * 1000
@@ -192,10 +207,9 @@ class Datastore:
                     return (0, None)  # If user doesn't have time, return default values
 
                 # Get the user's position from the sorted set (zrank returns the 0-based index)
-                print("here2")
                 # user_position = await asyncio.to_thread(conn_user_stats.zrank, leaderboard_key, str(user_id))
                 user_position = await asyncio.to_thread(conn_user_stats.zrevrank, key, str(user_id))
-                print(f"{user_position}")
+                # print(f"{user_position}")
 
                 end = time.perf_counter()
                 elapsed_ms = (end - start) * 1000
