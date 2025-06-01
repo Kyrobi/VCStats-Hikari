@@ -13,7 +13,7 @@ datastore = Datastore()
 # This command clears the leaderboard for a server
 @plugin.command
 @lightbulb.app_command_permissions(dm_enabled=False)
-@lightbulb.option("user_id", "ID of the member you want to reset", type=str, required=True)
+@lightbulb.option("user", "The member you want to reset", type=hikari.OptionType.MENTIONABLE, required=True)
 @lightbulb.command("resetuser", "Reset a specific user's stats. This cannot be undone!!!")
 @lightbulb.implements(lightbulb.SlashCommand)
 async def status_command(e: lightbulb.Context) -> None:
@@ -35,7 +35,8 @@ async def status_command(e: lightbulb.Context) -> None:
         return
     
     if await if_member_is_owner(guild_id=e.guild_id, user_id=member.id) or await if_member_has_permission(member, hikari.Permissions.ADMINISTRATOR):
-        member_to_reset: Optional[str] = e.options.user_id if hasattr(e.options, 'user_id') else None
+
+        member_to_reset: Optional[hikari.Snowflake] = e.options.user if hasattr(e.options, 'user') else None
 
         if member_to_reset is None:
             await e.respond("Invalid member.")
