@@ -57,7 +57,7 @@ async def status_command(e: lightbulb.Context) -> None:
             await e.respond("Something went wrong running this command.")
             return
         except ValueError:
-            await e.respond("Invalud user ID.")
+            await e.respond("Invalid user ID.")
             return
 
     else:
