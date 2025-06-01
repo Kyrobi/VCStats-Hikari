@@ -7,7 +7,6 @@ from typing import List, Optional, Dict
 from objects.user import User
 from asyncache import cached # type: ignore
 from cachetools import TTLCache
-from helper import log_info_to_channel, make_key
 
 DATABASE_NOT_CONNECTED_MESSAGE = "Database is not connected..."
 
@@ -66,13 +65,14 @@ class Datastore:
 
 
     async def insert(self, user_id: int, time_difference: int, server_id: int):
+        "Do not call this method directly. It's used by functions liked save_single()"
         try:
             if conn_user_stats:
-                key = str(server_id)
-                field = str(user_id)
 
                 # Get the current time value for the user from the hash
-                current_time = await asyncio.to_thread(conn_user_stats.hget, key, field)
+                # current_time = await asyncio.to_thread(conn_user_stats.hget, key, field)
+                key = f"guild:{server_id}"
+                current_time = await asyncio.to_thread(conn_user_stats.zscore, key, str(user_id))
 
                 # If the time exists, add the time difference, otherwise set it to the time_difference
                 if current_time:
@@ -81,7 +81,9 @@ class Datastore:
                     new_time = time_difference
 
                 # Set the new time in the hash
-                await asyncio.to_thread(conn_user_stats.hset, key, field, str(new_time)) # type: ignore
+                # await asyncio.to_thread(conn_user_stats.hset, key, field, str(new_time)) # type: ignore
+                # conn_user_stats.zadd(key, {str(user_id): str(new_time)})
+                await asyncio.to_thread(conn_user_stats.zadd, key, {str(user_id): str(new_time)})
 
             else:
                 print(DATABASE_NOT_CONNECTED_MESSAGE)
@@ -90,6 +92,8 @@ class Datastore:
             print(f"Error inserting data: {error}")
 
     async def save_single(self, user_id1: int, guild_id1: int) -> None:
+        from helper import make_key
+
         dict_key: str = make_key(user_id1, guild_id1)
         user_from_tracking_queue: User = tracking_queue[dict_key]
 
@@ -108,6 +112,7 @@ class Datastore:
             await self.insert(user_id, time_difference, guild_id)
             end = time.perf_counter()
             elapsed_ms = (end - start) * 1000
+            from helper import log_info_to_channel
             await log_info_to_channel(1377205400981602334,f"`insert` completed in {elapsed_ms:.3f}ms")
 
             user_from_tracking_queue.set_joined_time(int(time.time()))
@@ -143,11 +148,13 @@ class Datastore:
         for i in range(0, len(user_ids), BATCH_SIZE):
             pipe = conn_user_stats.pipeline(transaction=False) # type: ignore
             for j in range(i, min(i + BATCH_SIZE, len(user_ids))):
-                pipe.hset(str(server_ids[j]), str(user_ids[j]), str(time_differences[j])) # type: ignore
+                key = f"guild:{server_ids[j]}"
+                pipe.zadd(key, {str(user_ids[j]): time_differences[j]}) # type: ignore
             await asyncio.to_thread(pipe.execute)
 
         end = time.perf_counter()
         elapsed_ms = (end - start) * 1000
+        from helper import log_info_to_channel
         await log_info_to_channel(1377200295389565020,f"`save_all` completed in {elapsed_ms:.3f}ms")
 
 
@@ -156,15 +163,17 @@ class Datastore:
         try:
             if conn_user_stats:
 
-                key = str(server_id)
-                field = str(user_id)
+                key = f"guild:{server_id}"
 
                 # Use asyncio.to_thread to run the synchronous hget in a separate thread
-                result: Optional[str] = await asyncio.to_thread(conn_user_stats.hget, key, field) # type: ignore
+                print("here1")
+                result: Optional[str] = await asyncio.to_thread(conn_user_stats.zscore, key, str(user_id)) # type: ignore
+                print(f"{result}")
 
                 # Return the result, defaulting to 0 if not found
                 end = time.perf_counter()
                 elapsed_ms = (end - start) * 1000
+                from helper import log_info_to_channel
                 await log_info_to_channel(1377200295389565020,f"`get_user_time` completed in {elapsed_ms:.3f}ms")
                 return int(result) if result else 0
             else:
@@ -174,26 +183,31 @@ class Datastore:
             print(f"Error fetching time: {error}")
             return None
         
-        
+
     async def get_user_time_and_position(self, user_id: int, server_id: int) -> tuple[int, Optional[int]]:
         
         try:
             if conn_user_stats:
                 start = time.perf_counter()
-                # Define the key for the leaderboard sorted set
-                leaderboard_key = f"leaderboard:{server_id}"
 
                 # Get the user's time from the sorted set (zscore returns the score, i.e., time)
-                user_time = await asyncio.to_thread(conn_user_stats.zscore, leaderboard_key, str(user_id))
+                # user_time = await asyncio.to_thread(conn_user_stats.zscore, leaderboard_key, str(user_id))
+                key = f"guild:{server_id}"
+                user_time = await asyncio.to_thread(conn_user_stats.zscore, key, str(user_id))
 
                 if user_time is None:
+                    print("None user time")
                     return (0, None)  # If user doesn't have time, return default values
 
                 # Get the user's position from the sorted set (zrank returns the 0-based index)
-                user_position = await asyncio.to_thread(conn_user_stats.zrank, leaderboard_key, str(user_id))
+                print("here2")
+                # user_position = await asyncio.to_thread(conn_user_stats.zrank, leaderboard_key, str(user_id))
+                user_position = await asyncio.to_thread(conn_user_stats.zrevrank, key, str(user_id))
+                print(f"{user_position}")
 
                 end = time.perf_counter()
                 elapsed_ms = (end - start) * 1000
+                from helper import log_info_to_channel
                 await log_info_to_channel(1377200295389565020,f"`get_user_time_and_position` completed in {elapsed_ms:.3f}ms")
 
                 # Return the time and position (position is 1-based)
@@ -213,14 +227,15 @@ class Datastore:
     async def get_leaderboard_members_and_time(self, guild_id: int) -> tuple[list[int], list[int]]:
         users: List[int] = []
         times: List[int] = []
+
+        key = f"guild:{guild_id}"
+
         start = time.perf_counter()
         try:
             if conn_user_stats:
-                # Define the key for the leaderboard sorted set
-                leaderboard_key = f"leaderboard:{guild_id}"
 
                 # Get the top 500 users by time (scores in descending order)
-                leaderboard = await asyncio.to_thread(conn_user_stats.zrange, leaderboard_key, 0, 499, withscores=True) # type: ignore
+                leaderboard = await asyncio.to_thread(conn_user_stats.zrevrange, key, 0, 499, withscores=True) # type: ignore
 
                 # Loop through the leaderboard and separate the user IDs and times
                 for user_id, score in leaderboard: # type: ignore
@@ -235,17 +250,18 @@ class Datastore:
 
         end = time.perf_counter()
         elapsed_ms = (end - start) * 1000
+        from helper import log_info_to_channel
         await log_info_to_channel(1377200295389565020,f"`get_leaderboard_members_and_time` completed in {elapsed_ms:.3f}ms")
             
         return users, times
 
     async def reset_guild_data(self, guild_id: int) -> None:
         start = time.perf_counter()
-
+        key = f"guild:{guild_id}"
         try:
             if conn_user_stats:
                 # await conn_user_stats.delete(str(guild_id))
-                await asyncio.to_thread(conn_user_stats.delete, str(guild_id))
+                await asyncio.to_thread(conn_user_stats.delete, key)
             else:
                 print(DATABASE_NOT_CONNECTED_MESSAGE)
         except Exception as error:
@@ -253,16 +269,17 @@ class Datastore:
 
         end = time.perf_counter()
         elapsed_ms = (end - start) * 1000
+        from helper import log_info_to_channel
         await log_info_to_channel(1377200295389565020,f"`reset_guild_data` completed in {elapsed_ms:.3f}ms")
 
 
     async def reset_user_data(self, guild_id: int, user_id: int) -> None:
         start = time.perf_counter()
-
+        key = f"guild:{guild_id}"
         try:
             if conn_user_stats:
                 # conn_user_stats.hdel(str(guild_id), str(user_id))
-                await asyncio.to_thread(conn_user_stats.hdel, str(guild_id), str(user_id))
+                await asyncio.to_thread(conn_user_stats.zrem, key, str(user_id))
             else:
                 print(DATABASE_NOT_CONNECTED_MESSAGE)
         except Exception as error:
@@ -270,4 +287,5 @@ class Datastore:
 
         end = time.perf_counter()
         elapsed_ms = (end - start) * 1000
+        from helper import log_info_to_channel
         await log_info_to_channel(1377200295389565020,f"`reset_specific_user` completed in {elapsed_ms:.3f}ms")

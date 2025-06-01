@@ -5,9 +5,10 @@ from typing import Dict, Optional
 from lightbulb import BotApp
 import lightbulb
 
-from helper import get_tracking_queue
+from datastore import Datastore
 
 plugin = lightbulb.Plugin("logging")
+datastore = Datastore()
 
 shard_guild_counter: Dict[int, int] = {}
 total_guild_count: int = 0
@@ -120,7 +121,7 @@ async def fetch_stats(bot: Optional[BotApp]) -> str:
 **Last 24 hours**
 ```
 Total servers: {total_guild_count}
-Total members in VC: {len(get_tracking_queue())}
+Total members in VC: {len(datastore.get_tracking_queue())}
 ==========
 Total times joined: {totalTimesJoined}
 Total times left: {totalTimesLeft}
