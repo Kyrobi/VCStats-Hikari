@@ -155,7 +155,7 @@ class Datastore:
                     pipe.zadd(key, {str(user_ids[j]): time_differences[j]}, incr=True) # type: ignore # incr=True making sure it adds to the time instead of overriding
 
                 await asyncio.to_thread(pipe.execute)
-                
+
             except Exception as error:
                 print(f"Error in batch: {error}")
 
@@ -163,32 +163,6 @@ class Datastore:
         elapsed_ms = (end - start) * 1000
         from helper import log_info_to_channel
         await log_info_to_channel(1377200295389565020,f"`save_all` completed in {elapsed_ms:.3f}ms")
-
-
-    async def get_user_time(self, user_id: int, server_id: int) -> Optional[int]:
-        start = time.perf_counter()
-        try:
-            if conn_user_stats:
-
-                key = f"guild:{server_id}"
-
-                # Use asyncio.to_thread to run the synchronous hget in a separate thread
-                print("here1")
-                result: Optional[str] = await asyncio.to_thread(conn_user_stats.zscore, key, str(user_id)) # type: ignore
-                print(f"{result}")
-
-                # Return the result, defaulting to 0 if not found
-                end = time.perf_counter()
-                elapsed_ms = (end - start) * 1000
-                from helper import log_info_to_channel
-                await log_info_to_channel(1377200295389565020,f"`get_user_time` completed in {elapsed_ms:.3f}ms")
-                return int(result) if result else 0
-            else:
-                print(DATABASE_NOT_CONNECTED_MESSAGE)
-                return None
-        except Exception as error:  # Catch any potential errors
-            print(f"Error fetching time: {error}")
-            return None
         
 
     async def get_user_time_and_position(self, user_id: int, server_id: int) -> tuple[int, Optional[int]]:

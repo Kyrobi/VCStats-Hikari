@@ -80,7 +80,7 @@ async def on_guild_available(event: hikari.GuildAvailableEvent) -> None:
     # So it doesn't return all the voice channel, but all the users that are in the voice channels
     voice_states: Mapping[hikari.Snowflake, hikari.VoiceState] = event.guild.get_voice_states()
 
-    for user_id, user_voice_state in voice_states.items():
+    for user_id, user_voice_state in voice_states.items(): # type: ignore
 
         member: Optional[hikari.Member] = bot.cache.get_member(event.guild_id, user_id)
         if member and member.is_bot:
