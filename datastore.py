@@ -1,5 +1,5 @@
 import config
-import valkey
+import valkey.asyncio as valkey
 import asyncio
 import time
 
@@ -29,8 +29,25 @@ class Datastore:
         global conn_server_settings
 
         # Define the connection pools
-        connection_pool_0 = valkey.ConnectionPool(host=config.VALKEY_HOST, port=config.VALKEY_PORT, db=0)
-        connection_pool_1 = valkey.ConnectionPool(host=config.VALKEY_HOST, port=config.VALKEY_PORT, db=1)
+        connection_pool_0 = valkey.ConnectionPool(
+            host=config.VALKEY_HOST, 
+            port=config.VALKEY_PORT, 
+            db=0,
+            retry_on_timeout=True,
+            socket_timeout=30,
+            socket_connect_timeout=30,
+            max_connections=20,
+            )
+        
+        connection_pool_1 = valkey.ConnectionPool(
+            host=config.VALKEY_HOST, 
+            port=config.VALKEY_PORT, 
+            db=1,
+            retry_on_timeout=True,
+            socket_timeout=30,
+            socket_connect_timeout=30,
+            max_connections=20,
+            )
 
         # Establish the actual connections
         conn_user_stats = valkey.Valkey(connection_pool=connection_pool_0)
@@ -40,17 +57,17 @@ class Datastore:
     async def uninitialize(self):
         # Close the clients
         if conn_user_stats:
-            conn_user_stats.close()
+            await conn_user_stats.aclose()
 
         if conn_server_settings:
-            conn_server_settings.close()
+            await conn_server_settings.aclose()
 
         # Close the connection pools
         if connection_pool_0:
-            connection_pool_0.disconnect()
+            await connection_pool_0.aclose()
 
         if connection_pool_1:
-            connection_pool_1.disconnect()
+            await connection_pool_1.aclose()
 
     def get_tracking_queue(self) -> Dict[str, User]:
         return tracking_queue
@@ -64,8 +81,8 @@ class Datastore:
         try:
             if conn_user_stats:
                 key = f"guild:{server_id}"
-                await asyncio.to_thread(
-                    conn_user_stats.zadd, 
+
+                await conn_user_stats.zadd(
                     key, 
                     {str(user_id): time_difference}, 
                     incr=True
@@ -155,23 +172,15 @@ class Datastore:
         for i in range(0, len(user_ids), BATCH_SIZE):
             pipe = None
             try:
-                pipe = conn_user_stats.pipeline(transaction=False) # type: ignore
-
-                for j in range(i, min(i + BATCH_SIZE, len(user_ids))):
-
-                    key = f"guild:{server_ids[j]}"
-                    pipe.zadd(key, {str(user_ids[j]): time_differences[j]}, incr=True) # type: ignore # incr=True making sure it adds to the time instead of overriding
-
-                await asyncio.wait_for(asyncio.to_thread(pipe.execute), timeout=10) # type: ignore
+                async with conn_user_stats.pipeline(transaction=False) as pipe:
+                    for j in range(i, min(i + BATCH_SIZE, len(user_ids))):
+                        key = f"guild:{server_ids[j]}"
+                        pipe.zadd(key, {str(user_ids[j]): time_differences[j]}, incr=True)
+                    
+                    await pipe.execute()
 
             except Exception as error:
                 print(f"Error in batch {i//BATCH_SIZE + 1} {error}")
-            finally:
-                if pipe:
-                    try:
-                        pipe.reset()
-                    except Exception:
-                        pass
 
         end = time.perf_counter()
         elapsed_ms = (end - start) * 1000
@@ -189,11 +198,10 @@ class Datastore:
                 # user_time = await asyncio.to_thread(conn_user_stats.zscore, leaderboard_key, str(user_id))
                 key = f"guild:{server_id}"
 
-                pipe = conn_user_stats.pipeline(transaction=False) # type: ignore
-                pipe.zscore(key, str(user_id))
-                pipe.zrevrank(key, str(user_id))
-
-                results = await asyncio.to_thread(pipe.execute) # type: ignore
+                async with conn_user_stats.pipeline(transaction=False) as pipe:
+                    pipe.zscore(key, str(user_id))
+                    pipe.zrevrank(key, str(user_id))
+                    results = await pipe.execute() # type: ignore
 
                 user_time = results[0] # type: ignore
                 user_position = results[1] # type: ignore
@@ -235,7 +243,7 @@ class Datastore:
             if conn_user_stats:
 
                 # Get the top 500 users by time (scores in descending order)
-                leaderboard = await asyncio.to_thread(conn_user_stats.zrevrange, key, 0, 199, withscores=True) # type: ignore
+                leaderboard = await conn_user_stats.zrevrange(key, 0, 199, withscores=True) # type: ignore
 
                 # Loop through the leaderboard and separate the user IDs and times
                 for user_id, score in leaderboard: # type: ignore
@@ -261,8 +269,7 @@ class Datastore:
         key = f"guild:{guild_id}"
         try:
             if conn_user_stats:
-                # await conn_user_stats.delete(str(guild_id))
-                await asyncio.to_thread(conn_user_stats.delete, key)
+                await conn_user_stats.delete(key)
             else:
                 print(DATABASE_NOT_CONNECTED_MESSAGE)
         except Exception as error:
@@ -279,8 +286,7 @@ class Datastore:
         key = f"guild:{guild_id}"
         try:
             if conn_user_stats:
-                # conn_user_stats.hdel(str(guild_id), str(user_id))
-                await asyncio.to_thread(conn_user_stats.zrem, key, str(user_id))
+                await conn_user_stats.zrem(key, str(user_id))
             else:
                 print(DATABASE_NOT_CONNECTED_MESSAGE)
         except Exception as error:
