@@ -32,6 +32,8 @@ async def leaderboard_command(e: lightbulb.Context) -> None:
 
     requested_page = max(1, int(page))  # This is the page that the user wants to see. Ensure page is at least 1
 
+    await datastore.save_guild(guild_id=guild_id) # Save all the users in the guild so that all the data in the leaderboard will be fresh
+
     # Get all members from the database that are associated with this guild
     all_members: Optional[List[int]]
     all_times: Optional[List[int]]
@@ -77,7 +79,7 @@ async def leaderboard_command(e: lightbulb.Context) -> None:
     # Create embed
     embed = hikari.Embed(
         title="Voice Call Leaderboard [Top 200]",
-        description=f"{leaderboard_content}\n\n{server_total}{result_suffix}{next_page_notice}\n\n(Leaderboard updates every hour)",
+        description=f"{leaderboard_content}\n\n{server_total}{result_suffix}{next_page_notice}",
         color=0x3498db
     )
     

@@ -3,5 +3,4 @@ hikari-lightbulb==2.3.5.post1 # Hikari addon that implements slash command handl
 hikari-miru==4.2.0 # Hikari addon that implements component handling (i.e. modals)
 psutil==7.0.0 # Gets info about the system (e.g. ram usage)
 aiosqlite>=0.21.0
-asyncache==0.3.1
 valkey[libvalkey]

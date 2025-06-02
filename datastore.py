@@ -5,16 +5,11 @@ import time
 
 from typing import List, Optional, Dict
 from objects.user import User
-from asyncache import cached # type: ignore
-from cachetools import TTLCache
 
 DATABASE_NOT_CONNECTED_MESSAGE = "Database is not connected..."
 
 tracking_queue: Dict[str, User] = {}
 tracking_queue_lock = asyncio.Lock()
-
-# Dict[Tuple[int, int], int] -> guildID, userID, position
-user_leaderboard_position_cache: TTLCache[tuple[int, int], int] = TTLCache(maxsize=10_000, ttl=60 * 60) # type: ignore
 
 # Define the connection pools
 connection_pool_0 = None
@@ -113,6 +108,7 @@ class Datastore:
                 finally:
                     user_from_tracking_queue.set_joined_time(int(time.time()))
 
+
     async def save_all(self) -> None:
         if not conn_user_stats:
             print(DATABASE_NOT_CONNECTED_MESSAGE)
@@ -163,6 +159,59 @@ class Datastore:
         elapsed_ms = (end - start) * 1000
         from helper import log_info_to_channel
         await log_info_to_channel(1377200295389565020,f"`save_all` completed in {elapsed_ms:.3f}ms")
+
+    
+    async def save_guild(self, guild_id: int) -> None:
+        if not conn_user_stats:
+            print(DATABASE_NOT_CONNECTED_MESSAGE)
+            return
+        
+        user_ids: List[int] = []
+        time_differences: List[int] = []
+        server_ids: List[int] = []
+
+        async with tracking_queue_lock:
+            for user in tracking_queue.values():
+                if user.get_guild_id() == guild_id:
+                    current_user: User = user
+
+                    time_difference: int = int(time.time()) - current_user.get_joined_time()
+
+                    if(time_difference <= 0):
+                        continue
+
+                    time_differences.append(time_difference)
+                    user_ids.append(current_user.get_user_id())
+                    server_ids.append(current_user.get_guild_id())
+
+                    # Make sure to update the time delta once saving
+                    current_user.set_joined_time(int(time.time()))
+
+        # Assumes there nothing to save, so don't run the rest of the code
+        if not user_ids: 
+            return
+
+        start = time.perf_counter()
+        
+        BATCH_SIZE = 1000
+        for i in range(0, len(user_ids), BATCH_SIZE):
+            try:
+                pipe = conn_user_stats.pipeline(transaction=False) # type: ignore
+
+                for j in range(i, min(i + BATCH_SIZE, len(user_ids))):
+
+                    key = f"guild:{server_ids[j]}"
+                    pipe.zadd(key, {str(user_ids[j]): time_differences[j]}, incr=True) # type: ignore # incr=True making sure it adds to the time instead of overriding
+
+                await asyncio.to_thread(pipe.execute)
+
+            except Exception as error:
+                print(f"Error in batch: {error}")
+
+        end = time.perf_counter()
+        elapsed_ms = (end - start) * 1000
+        from helper import log_info_to_channel
+        await log_info_to_channel(1377200295389565020,f"`save_all_guild` completed in {elapsed_ms:.3f}ms")
         
 
     async def get_user_time_and_position(self, user_id: int, server_id: int) -> tuple[int, Optional[int]]:
@@ -210,9 +259,6 @@ class Datastore:
             return (0, None)
         
         
-
-    get_leaderboard_members_and_time_cache = TTLCache(maxsize=500, ttl=60 * 58 * 1) # type: ignore
-    @cached(get_leaderboard_members_and_time_cache) # type: ignore
     async def get_leaderboard_members_and_time(self, guild_id: int) -> tuple[list[int], list[int]]:
         users: List[int] = []
         times: List[int] = []
@@ -243,6 +289,7 @@ class Datastore:
         await log_info_to_channel(1377200295389565020,f"`get_leaderboard_members_and_time` completed in {elapsed_ms:.3f}ms")
             
         return users, times
+
 
     async def reset_guild_data(self, guild_id: int) -> None:
         start = time.perf_counter()
