@@ -97,7 +97,7 @@ async def auto_save_all(interval_seconds: int) -> None:
     while True:
         # print("Running auto_save_all")
         if datastore:
-            await datastore.save_all()
+            await datastore.save_all(None)
         else:
             print("Datastore was not available...")
 
