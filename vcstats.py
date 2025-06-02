@@ -63,7 +63,7 @@ async def on_started(event: hikari.StartedEvent) -> None:
 @bot.listen(hikari.StoppingEvent)
 async def on_stopping(event: hikari.StoppingEvent) -> None:
     if datastore:
-        await datastore.save_all()
+        await datastore.save_all(None)
     else:
         print("Datastore was not available...")
 
