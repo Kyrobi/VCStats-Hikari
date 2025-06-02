@@ -109,7 +109,10 @@ class Datastore:
                     user_from_tracking_queue.set_joined_time(int(time.time()))
 
 
-    async def save_all(self) -> None:
+    async def save_all(self, guild_id: Optional[int]) -> None:
+        """
+        Pass in a guild_id if you want to only bulk save a specific guild
+        """
         if not conn_user_stats:
             print(DATABASE_NOT_CONNECTED_MESSAGE)
             return
@@ -118,21 +121,28 @@ class Datastore:
         time_differences: List[int] = []
         server_ids: List[int] = []
 
-        async with tracking_queue_lock:
-            for user in tracking_queue.values():
-                current_user: User = user
+        try:
+            async with tracking_queue_lock:
+                for user in tracking_queue.values():
 
-                time_difference: int = int(time.time()) - current_user.get_joined_time()
+                    if guild_id is None or guild_id == user.get_guild_id():
 
-                if(time_difference <= 0):
-                    continue
+                        current_user: User = user
 
-                time_differences.append(time_difference)
-                user_ids.append(current_user.get_user_id())
-                server_ids.append(current_user.get_guild_id())
+                        time_difference: int = int(time.time()) - current_user.get_joined_time()
 
-                # Make sure to update the time delta once saving
-                current_user.set_joined_time(int(time.time()))
+                        if(time_difference <= 0):
+                            continue
+
+                        time_differences.append(time_difference)
+                        user_ids.append(current_user.get_user_id())
+                        server_ids.append(current_user.get_guild_id())
+
+                        # Make sure to update the time delta once saving
+                        current_user.set_joined_time(int(time.time()))
+        except Exception as error:
+            print(f"Error collecting data for save_all: {error}")
+            return
 
         # Assumes there nothing to save, so don't run the rest of the code
         if not user_ids: 
@@ -141,7 +151,9 @@ class Datastore:
         start = time.perf_counter()
         
         BATCH_SIZE = 1000
+
         for i in range(0, len(user_ids), BATCH_SIZE):
+            pipe = None
             try:
                 pipe = conn_user_stats.pipeline(transaction=False) # type: ignore
 
@@ -150,68 +162,21 @@ class Datastore:
                     key = f"guild:{server_ids[j]}"
                     pipe.zadd(key, {str(user_ids[j]): time_differences[j]}, incr=True) # type: ignore # incr=True making sure it adds to the time instead of overriding
 
-                await asyncio.to_thread(pipe.execute)
+                await asyncio.wait_for(asyncio.to_thread(pipe.execute), timeout=10) # type: ignore
 
             except Exception as error:
-                print(f"Error in batch: {error}")
+                print(f"Error in batch {i//BATCH_SIZE + 1} {error}")
+            finally:
+                if pipe:
+                    try:
+                        pipe.reset()
+                    except Exception:
+                        pass
 
         end = time.perf_counter()
         elapsed_ms = (end - start) * 1000
         from helper import log_info_to_channel
         await log_info_to_channel(1377200295389565020,f"`save_all` completed in {elapsed_ms:.3f}ms")
-
-    
-    async def save_guild(self, guild_id: int) -> None:
-        if not conn_user_stats:
-            print(DATABASE_NOT_CONNECTED_MESSAGE)
-            return
-        
-        user_ids: List[int] = []
-        time_differences: List[int] = []
-        server_ids: List[int] = []
-
-        async with tracking_queue_lock:
-            for user in tracking_queue.values():
-                if user.get_guild_id() == guild_id:
-                    current_user: User = user
-
-                    time_difference: int = int(time.time()) - current_user.get_joined_time()
-
-                    if(time_difference <= 0):
-                        continue
-
-                    time_differences.append(time_difference)
-                    user_ids.append(current_user.get_user_id())
-                    server_ids.append(current_user.get_guild_id())
-
-                    # Make sure to update the time delta once saving
-                    current_user.set_joined_time(int(time.time()))
-
-        # Assumes there nothing to save, so don't run the rest of the code
-        if not user_ids: 
-            return
-
-        start = time.perf_counter()
-        
-        BATCH_SIZE = 1000
-        for i in range(0, len(user_ids), BATCH_SIZE):
-            try:
-                pipe = conn_user_stats.pipeline(transaction=False) # type: ignore
-
-                for j in range(i, min(i + BATCH_SIZE, len(user_ids))):
-
-                    key = f"guild:{server_ids[j]}"
-                    pipe.zadd(key, {str(user_ids[j]): time_differences[j]}, incr=True) # type: ignore # incr=True making sure it adds to the time instead of overriding
-
-                await asyncio.to_thread(pipe.execute)
-
-            except Exception as error:
-                print(f"Error in batch: {error}")
-
-        end = time.perf_counter()
-        elapsed_ms = (end - start) * 1000
-        from helper import log_info_to_channel
-        await log_info_to_channel(1377200295389565020,f"`save_all_guild` completed in {elapsed_ms:.3f}ms")
         
 
     async def get_user_time_and_position(self, user_id: int, server_id: int) -> tuple[int, Optional[int]]:
