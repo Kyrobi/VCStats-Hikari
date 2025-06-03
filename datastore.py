@@ -77,33 +77,32 @@ class Datastore:
     async def save_single(self, user_id1: int, guild_id1: int) -> None:
         from helper import make_key
 
-        async with tracking_queue_lock:
-            dict_key: str = make_key(user_id1, guild_id1)
+        dict_key: str = make_key(user_id1, guild_id1)
 
-            if dict_key not in tracking_queue:
-                return
+        if dict_key not in tracking_queue:
+            return
 
-            user_from_tracking_queue: User = tracking_queue[dict_key]
+        user_from_tracking_queue: User = tracking_queue[dict_key]
 
-            user_id: int = user_from_tracking_queue.get_user_id()
-            time_difference: int = int(time.time() - user_from_tracking_queue.get_joined_time())
-            guild_id: int = user_from_tracking_queue.get_guild_id()
+        user_id: int = user_from_tracking_queue.get_user_id()
+        time_difference: int = int(time.time() - user_from_tracking_queue.get_joined_time())
+        guild_id: int = user_from_tracking_queue.get_guild_id()
 
-            if time_difference <= 0:
-                return
+        if time_difference <= 0:
+            return
 
-            # Save the time, and then update the time to current so that
-            # the difference calculation doesn't break
-            if connection is not None:
-                try:
-                    start = time.perf_counter()
-                    await self.insert(user_id, time_difference, guild_id)
-                    end = time.perf_counter()
-                    elapsed_ms = (end - start) * 1000
-                    from helper import log_info_to_channel
-                    await log_info_to_channel(1377205400981602334,f"`insert` completed in {elapsed_ms:.3f}ms")
-                finally:
-                    user_from_tracking_queue.set_joined_time(int(time.time()))
+        # Save the time, and then update the time to current so that
+        # the difference calculation doesn't break
+        if connection is not None:
+            try:
+                start = time.perf_counter()
+                await self.insert(user_id, time_difference, guild_id)
+                end = time.perf_counter()
+                elapsed_ms = (end - start) * 1000
+                from helper import log_info_to_channel
+                await log_info_to_channel(1377205400981602334,f"`insert` completed in {elapsed_ms:.3f}ms")
+            finally:
+                user_from_tracking_queue.set_joined_time(int(time.time()))
 
 
     async def save_all(self, guild_id: Optional[int]) -> None:

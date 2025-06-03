@@ -43,7 +43,7 @@ async def on_starting(event: hikari.StartingEvent) -> None:
     bot.load_extensions("commands.command_leaderboard")
     bot.load_extensions("commands.command_reset_guild_stats")
     bot.load_extensions("commands.command_reset_user_stats")
-    # bot.load_extensions("commands.command_test")
+    bot.load_extensions("commands.command_test")
     bot.load_extensions("logging_stuff")
 
 # After bot has fully started
@@ -56,7 +56,7 @@ async def on_started(event: hikari.StartedEvent) -> None:
     print(f"Initialized tracking for {len(datastore.get_tracking_queue())} users already in voice channels")
 
     asyncio.create_task(queue_updater(60 * 60 * 1)) # Runs every 1 hour
-    asyncio.create_task(auto_save_all(60 * 5)) # Runs every 5 minutes
+    asyncio.create_task(auto_save_all(60 * 10)) # Runs every 10 minutes
     asyncio.create_task(get_stats(60 * 60 * 24)) # Runs every 24 hours
 
 
@@ -125,25 +125,31 @@ async def queue_updater(interval_seconds: int) -> None:
     while True:
         print("Running tracking queue auto clearing")
         keys_to_remove: List[str] = []
+        users_to_save: List[tuple[int, int]] = []
 
         async with datastore.get_tracking_queue_lock():
             tracking_queue: Dict[str, User] = datastore.get_tracking_queue().copy()
 
 
-            for key in tracking_queue:
-                user_id, guild_id = map(int, key.split("-"))
-                # print(f"Tracking queue uid: {user_id}, gid: {guild_id}")
-                user_voice_state: Optional[hikari.VoiceState] = bot.cache.get_voice_state(guild_id, user_id)
+        for key in tracking_queue:
+            user_id, guild_id = map(int, key.split("-"))
+            # print(f"Tracking queue uid: {user_id}, gid: {guild_id}")
+            user_voice_state: Optional[hikari.VoiceState] = bot.cache.get_voice_state(guild_id, user_id)
 
-                # If the user is not in voice channel and they are still in the queue, we add it to the removal list
-                if user_voice_state is None:
-                    if key in tracking_queue:
-                        keys_to_remove.append(key)
-                        await datastore.save_single(user_id1=user_id, guild_id1=guild_id)
- 
-            # Now remove it from the actual dictionary
-            for key in keys_to_remove:
-                datastore.get_tracking_queue().pop(key, None)
+            # If the user is not in voice channel and they are still in the queue, we add it to the removal list
+            if user_voice_state is None:
+                keys_to_remove.append(key)
+                users_to_save.append((user_id, guild_id))
+
+        # Save users outside of the lock
+        for user_id, guild_id in users_to_save:
+            await datastore.save_single(user_id, guild_id)
+
+        # Now remove it from the actual dictionary
+        if keys_to_remove:
+            async with datastore.get_tracking_queue_lock():
+                for key in keys_to_remove:
+                    datastore.get_tracking_queue().pop(key, None)
 
         await asyncio.sleep(interval_seconds)
 

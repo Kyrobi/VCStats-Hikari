@@ -1,3 +1,4 @@
+import asyncio
 import hikari
 import lightbulb
 
@@ -31,12 +32,36 @@ async def leaderboard_command(e: lightbulb.Context) -> None:
 
     requested_page = max(1, int(page))  # This is the page that the user wants to see. Ensure page is at least 1
 
-    await datastore.save_all(guild_id=guild_id) # Save all the users in the guild so that all the data in the leaderboard will be fresh
+    all_times: Optional[List[int]] = None
+    all_members: Optional[List[int]] = None
 
-    # Get all members from the database that are associated with this guild
-    all_members: Optional[List[int]]
-    all_times: Optional[List[int]]
-    all_members, all_times = await datastore.get_leaderboard_members_and_time(guild_id)
+    try:
+        # Add timeout to prevent indefinite hanging
+        await asyncio.wait_for(
+            datastore.save_all(guild_id=guild_id), 
+            timeout=30.0  # 30 second timeout
+        )
+    except asyncio.TimeoutError:
+        await e.respond("The leaderboard is temporarily unavailable. Please try again later.")
+        return
+    except Exception as error:
+        print(f"Error in leaderboard save_all: {error}")
+        await e.respond("An error occurred while updating the leaderboard. Please try again later.")
+        return
+
+    try:
+        # Get leaderboard data with timeout
+        all_members, all_times = await asyncio.wait_for(
+            datastore.get_leaderboard_members_and_time(guild_id),
+            timeout=15.0
+        )
+    except asyncio.TimeoutError:
+        await e.respond("The leaderboard is temporarily unavailable. Please try again later.")
+        return
+    except Exception as error:
+        print(f"Error fetching leaderboard data: {error}")
+        await e.respond("An error occurred while updating the leaderboard. Please try again later.")
+        return
     
     increment_leaderboard_used()
 
