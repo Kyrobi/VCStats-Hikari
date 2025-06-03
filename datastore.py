@@ -141,17 +141,19 @@ class Datastore:
 
         start = time.perf_counter()
         
-        BATCH_SIZE = 1000
+        BATCH_SIZE = 100
 
         for i in range(0, len(user_ids), BATCH_SIZE):
             pipe = None
             try:
-                async with connection.pipeline(transaction=False) as pipe:
-                    for j in range(i, min(i + BATCH_SIZE, len(user_ids))):
-                        key = f"guild:{server_ids[j]}"
-                        pipe.zadd(key, {str(user_ids[j]): time_differences[j]}, incr=True)
-                    
-                    await pipe.execute()
+                await connection.ping() # type: ignore If the ping fails (i.e can't contact server), it raises and exception
+                async with asyncio.timeout(30):
+                    async with connection.pipeline(transaction=False) as pipe:
+                        for j in range(i, min(i + BATCH_SIZE, len(user_ids))):
+                            key = f"guild:{server_ids[j]}"
+                            pipe.zadd(key, {str(user_ids[j]): time_differences[j]}, incr=True)
+                        
+                        await pipe.execute()
 
             except Exception as error:
                 print(f"Error in batch {i//BATCH_SIZE + 1} {error}")
