@@ -1,4 +1,5 @@
 import config
+import asyncio
 import valkey.asyncio as valkey
 import time
 
@@ -8,6 +9,7 @@ from objects.user import User
 DATABASE_NOT_CONNECTED_MESSAGE = "Database is not connected..."
 
 tracking_queue: Dict[str, User] = {}
+tracking_queue_lock = asyncio.Lock()
 
 # Define the connection pools
 connection_pool = None
@@ -49,6 +51,9 @@ class Datastore:
 
     def get_tracking_queue(self) -> Dict[str, User]:
         return tracking_queue
+    
+    def get_tracking_queue_lock(self) -> asyncio.Lock:
+        return tracking_queue_lock
 
 
     async def insert(self, user_id: int, time_difference: int, server_id: int):
@@ -115,7 +120,7 @@ class Datastore:
 
         current_time = int(time.time())
 
-        # Iterate through a copy of the list to avoid size changing while iterating
+        # Iterate through a copy of the list to avoid size changing while iterating 
         for user in tracking_queue.copy().values():
             if guild_id is None or guild_id == user.get_guild_id():
                 time_difference: int = current_time - user.get_joined_time()

@@ -30,8 +30,9 @@ async def start_tracking_user(user_id: int, guild_id: int):
     # so that it doesn't mess up existing data
     seconds: int = int(time.time())
 
-    tracking_queue = datastore.get_tracking_queue()
-    tracking_queue[make_key(user_id, guild_id)] = User(user_id, guild_id, seconds)
+    async with datastore.get_tracking_queue_lock():
+        tracking_queue = datastore.get_tracking_queue()
+        tracking_queue[make_key(user_id, guild_id)] = User(user_id, guild_id, seconds)
     
 
 async def if_member_has_permission(member: hikari.Member, permission: hikari.Permissions) -> bool:

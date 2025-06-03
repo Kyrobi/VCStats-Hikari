@@ -146,8 +146,9 @@ async def queue_updater(interval_seconds: int) -> None:
             await datastore.save_single(user_id, guild_id)
 
         # Now remove it from the actual dictionary
-        for key in keys_to_remove:
-            datastore.get_tracking_queue().pop(key, None)
+        async with datastore.get_tracking_queue_lock():
+            for key in keys_to_remove:
+                datastore.get_tracking_queue().pop(key, None)
 
         await asyncio.sleep(interval_seconds)
 

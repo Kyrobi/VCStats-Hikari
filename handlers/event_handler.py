@@ -76,7 +76,8 @@ async def handle_leave(voice_state: hikari.VoiceState):
 
     dict_key: str = make_key(user_id, guild_id)
 
-    datastore.get_tracking_queue().pop(dict_key, None)
+    async with datastore.get_tracking_queue_lock():
+        datastore.get_tracking_queue().pop(dict_key, None)
 
 async def handle_switch(old_voice_state: hikari.VoiceState, new_voice_state: hikari.VoiceState):
     # UPDATE: We don't actually care about if the user switch channels
