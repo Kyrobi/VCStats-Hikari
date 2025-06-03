@@ -1,6 +1,5 @@
 import config
 import valkey.asyncio as valkey
-import asyncio
 import time
 
 from typing import List, Optional, Dict
@@ -9,7 +8,6 @@ from objects.user import User
 DATABASE_NOT_CONNECTED_MESSAGE = "Database is not connected..."
 
 tracking_queue: Dict[str, User] = {}
-tracking_queue_lock = asyncio.Lock()
 
 # Define the connection pools
 connection_pool = None
@@ -51,9 +49,6 @@ class Datastore:
 
     def get_tracking_queue(self) -> Dict[str, User]:
         return tracking_queue
-
-    def get_tracking_queue_lock(self) -> asyncio.Lock:
-        return tracking_queue_lock
 
 
     async def insert(self, user_id: int, time_difference: int, server_id: int):
@@ -117,28 +112,23 @@ class Datastore:
         time_differences: List[int] = []
         server_ids: List[int] = []
 
-        try:
-            async with tracking_queue_lock:
-                for user in tracking_queue.values():
 
-                    if guild_id is None or guild_id == user.get_guild_id():
+        current_time = int(time.time())
 
-                        current_user: User = user
+        # Iterate through a copy of the list to avoid size changing while iterating
+        for user in tracking_queue.copy().values():
+            if guild_id is None or guild_id == user.get_guild_id():
+                time_difference: int = current_time - user.get_joined_time()
 
-                        time_difference: int = int(time.time()) - current_user.get_joined_time()
+                if(time_difference <= 0):
+                    continue
 
-                        if(time_difference <= 0):
-                            continue
+                time_differences.append(time_difference)
+                user_ids.append(user.get_user_id())
+                server_ids.append(user.get_guild_id())
 
-                        time_differences.append(time_difference)
-                        user_ids.append(current_user.get_user_id())
-                        server_ids.append(current_user.get_guild_id())
-
-                        # Make sure to update the time delta once saving
-                        current_user.set_joined_time(int(time.time()))
-        except Exception as error:
-            print(f"Error collecting data for save_all: {error}")
-            return
+                # Make sure to update the time delta once saving
+                user.set_joined_time(current_time)
 
         # Assumes there nothing to save, so don't run the rest of the code
         if not user_ids: 

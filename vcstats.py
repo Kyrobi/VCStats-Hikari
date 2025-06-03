@@ -127,8 +127,8 @@ async def queue_updater(interval_seconds: int) -> None:
         keys_to_remove: List[str] = []
         users_to_save: List[tuple[int, int]] = []
 
-        async with datastore.get_tracking_queue_lock():
-            tracking_queue: Dict[str, User] = datastore.get_tracking_queue().copy()
+
+        tracking_queue: Dict[str, User] = datastore.get_tracking_queue().copy()
 
 
         for key in tracking_queue:
@@ -146,10 +146,8 @@ async def queue_updater(interval_seconds: int) -> None:
             await datastore.save_single(user_id, guild_id)
 
         # Now remove it from the actual dictionary
-        if keys_to_remove:
-            async with datastore.get_tracking_queue_lock():
-                for key in keys_to_remove:
-                    datastore.get_tracking_queue().pop(key, None)
+        for key in keys_to_remove:
+            datastore.get_tracking_queue().pop(key, None)
 
         await asyncio.sleep(interval_seconds)
 
