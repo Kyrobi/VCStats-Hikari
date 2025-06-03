@@ -7,7 +7,7 @@ from textwrap import dedent
 plugin = lightbulb.Plugin("command_donate")
 
 @plugin.command
-@lightbulb.command("donate", "Help contribute :)")
+@lightbulb.command("donate", "Buy me a coffe :)")
 @lightbulb.implements(lightbulb.SlashCommand)
 async def status_command(e: lightbulb.Context) -> None:
         # If bot tries to run commands, nothing will happen

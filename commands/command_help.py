@@ -30,10 +30,6 @@ def get_message() -> str:
     /resetall - Reset EVERYONE's total voice time. This can't be undone!!!
     /resetuser - Reset specific person's total voice time. This can't be undone!!!
     ```
-    **Notes**:
-    ```
-    - Users in an AFK voice channel won't have their time counted.
-    ```
     """).strip()
 
     return message
