@@ -15,7 +15,7 @@ async def status_command(e: lightbulb.Context) -> None:
         return
     
     message = dedent("""
-    If the bot has provided you value, feel free to [donate](<https://bit.ly/3YvmWud>) :)
+    [Buy me a coffee!](<https://ko-fi.com/kyrobi>)
     """).strip()
 
     await e.respond(
