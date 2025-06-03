@@ -39,7 +39,7 @@ async def leaderboard_command(e: lightbulb.Context) -> None:
         # Add timeout to prevent indefinite hanging
         await asyncio.wait_for(
             datastore.save_all(guild_id=guild_id), 
-            timeout=30.0  # 30 second timeout
+            timeout=2.0  # 30 second timeout
         )
     except asyncio.TimeoutError:
         await e.respond("The leaderboard is temporarily unavailable. Please try again later.")
@@ -53,7 +53,7 @@ async def leaderboard_command(e: lightbulb.Context) -> None:
         # Get leaderboard data with timeout
         all_members, all_times = await asyncio.wait_for(
             datastore.get_leaderboard_members_and_time(guild_id),
-            timeout=15.0
+            timeout=2.0
         )
     except asyncio.TimeoutError:
         await e.respond("The leaderboard is temporarily unavailable. Please try again later.")
