@@ -59,9 +59,6 @@ async def on_started(event: hikari.StartedEvent) -> None:
     asyncio.create_task(auto_save_all(60 * 5)) # Runs every 5 minutes
     asyncio.create_task(get_stats(60 * 60 * 24)) # Runs every 24 hours
 
-    await asyncio.sleep(3)
-    await bot.sync_application_commands()
-
 
 # Function when the bot is shutting down
 @bot.listen(hikari.StoppingEvent)
