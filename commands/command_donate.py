@@ -14,8 +14,9 @@ async def status_command(e: lightbulb.Context) -> None:
     if e.member and e.member.is_bot:
         return
     
-    message = dedent("""
-    [Buy me a coffee!](<https://ko-fi.com/kyrobi>)
+    message = dedent("""\
+    If you find this bot useful, consider
+    [buying me a coffee on ko-fi!](<https://ko-fi.com/kyrobi>) :heart:
     """).strip()
 
     await e.respond(

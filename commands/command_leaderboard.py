@@ -1,8 +1,10 @@
 import asyncio
+import random
+import textwrap
 import hikari
 import lightbulb
 
-from helper import seconds_to_timestamp
+from helper import log_info_to_channel, seconds_to_timestamp
 from logging_stuff import increment_leaderboard_used
 from typing import List, Optional
 from datastore import Datastore
@@ -99,14 +101,37 @@ async def leaderboard_command(e: lightbulb.Context) -> None:
     if requested_page < pages_possible:
         next_page_notice = f"\nDo `/leaderboard {requested_page + 1}` for more results."
     
+    donateMessage = textwrap.dedent(f"""\
+        If you find this bot useful, consider
+        [buying me a coffee on ko-fi!](<https://ko-fi.com/kyrobi>) :heart:
+        """)
+    
     # Create embed
-    embed = hikari.Embed(
-        title="Voice Call Leaderboard [Top 200]",
-        description=f"{leaderboard_content}\n\n{server_total}{result_suffix}{next_page_notice}",
-        color=0x3498db
-    )
+    randomNum = random.randint(1, 20)
+    if randomNum == 1:
 
-    await e.respond(embed)
+        embed = hikari.Embed(
+            title="Voice Call Leaderboard [Top 200]",
+            description=f"{leaderboard_content}\n\n{server_total}{result_suffix}{next_page_notice}\n\n{donateMessage}",
+            color=0x3498db
+        )
+        await e.respond(embed)
+
+        guild: Optional[hikari.Guild] = await plugin.app.rest.fetch_guild(guild_id)
+        if guild:
+            await log_info_to_channel(
+                channel_id=1301007012028743750, 
+                message=f"{guild.name}\nwas showned a donation message! /leaderboard" # type: ignore
+                )
+
+    else:
+        embed = hikari.Embed(
+            title="Voice Call Leaderboard [Top 200]",
+            description=f"{leaderboard_content}\n\n{server_total}{result_suffix}{next_page_notice}",
+            color=0x3498db
+        )
+        await e.respond(embed)
+
     
 
 def load(bot: lightbulb.BotApp) -> None:

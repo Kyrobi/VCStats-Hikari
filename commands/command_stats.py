@@ -1,7 +1,10 @@
+import random
+import textwrap
+import hikari
 import lightbulb
 
 from typing import Optional
-from helper import make_key, seconds_to_timestamp
+from helper import log_info_to_channel, make_key, seconds_to_timestamp
 from logging_stuff import increment_stats_used
 from datastore import Datastore
 
@@ -43,12 +46,30 @@ async def status_command(e: lightbulb.Context) -> None:
     # print(f"db_total_time: {db_total_time}, leaderboard_position: {leaderboard_position}")
     if leaderboard_position is not None:
         # If the user is not in the VC, just grab the time from the database
-        await e.respond(
-            f"{e.author.mention}\n"
-            f"Ranking: **#{leaderboard_position}**\n"
-            f"Total Time Spent: **{seconds_to_timestamp(db_total_time)}**\n\n"
-            ,user_mentions=True
-        )
+
+        message = textwrap.dedent(f"""\
+            {e.author.mention}
+            Ranking: **#{leaderboard_position}**
+            Total Time Spent: **{seconds_to_timestamp(db_total_time)}**
+        """)
+
+        randomNum = random.randint(1, 40)
+        if randomNum == 2:
+            message += textwrap.dedent(f"""\
+                                       
+                If you find this bot useful, consider
+                [buying me a coffee on ko-fi!](<https://ko-fi.com/kyrobi>) :heart:
+            """)
+
+
+        await e.respond(message,user_mentions=True)
+
+        guild: Optional[hikari.Guild] = await plugin.app.rest.fetch_guild(guild_id)
+        if guild:
+            await log_info_to_channel(
+                channel_id=1301007012028743750, 
+                message=f"{guild.name}\nwas showned a donation message! /stats" # type: ignore
+                )
 
     else:
         await e.respond("You have never been in a voice call before on this server. Please join one to start tracking your time.")
