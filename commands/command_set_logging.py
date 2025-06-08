@@ -14,7 +14,7 @@ datastore = Datastore()
 @plugin.command
 @lightbulb.app_command_permissions(dm_enabled=False)
 @lightbulb.option("channel", "Channel to log to", type=hikari.OptionType.CHANNEL, required=True)
-@lightbulb.command("vc_logging", "Set the channel to log stuff to")
+@lightbulb.command("vc_logging", "Sets the channel to log join and leave notifications to")
 @lightbulb.implements(lightbulb.SlashCommand)
 async def status_command(e: lightbulb.Context) -> None:
         # If bot tries to run commands, nothing will happen
