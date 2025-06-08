@@ -53,23 +53,8 @@ async def status_command(e: lightbulb.Context) -> None:
             Total Time Spent: **{seconds_to_timestamp(db_total_time)}**
         """)
 
-        randomNum = random.randint(1, 40)
-        if randomNum == 2:
-            message += textwrap.dedent(f"""\
-                                       
-                If you find this bot useful, consider
-                [buying me a coffee on ko-fi!](<https://ko-fi.com/kyrobi>) :heart:
-            """)
-
 
         await e.respond(message,user_mentions=True)
-
-        guild: Optional[hikari.Guild] = await plugin.app.rest.fetch_guild(guild_id)
-        if guild:
-            await log_info_to_channel(
-                channel_id=1301007012028743750, 
-                message=f"{guild.name}\nwas showned a donation message! /stats" # type: ignore
-                )
 
     else:
         await e.respond("You have never been in a voice call before on this server. Please join one to start tracking your time.")

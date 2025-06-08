@@ -43,7 +43,8 @@ async def on_starting(event: hikari.StartingEvent) -> None:
     bot.load_extensions("commands.command_leaderboard")
     bot.load_extensions("commands.command_reset_guild_stats")
     bot.load_extensions("commands.command_reset_user_stats")
-    bot.load_extensions("commands.command_test")
+    bot.load_extensions("commands.command_set_logging")
+
     bot.load_extensions("logging_stuff")
 
 # After bot has fully started

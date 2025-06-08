@@ -5,11 +5,14 @@ import time
 
 from typing import List, Optional, Dict
 from objects.user import User
+from objects.server import Server
 
 DATABASE_NOT_CONNECTED_MESSAGE = "Database is not connected..."
 
 tracking_queue: Dict[str, User] = {}
 tracking_queue_lock = asyncio.Lock()
+
+server_settings: Dict[int, Server] = {}
 
 # Define the connection pools
 connection_pool = None
@@ -272,3 +275,54 @@ class Datastore:
         elapsed_ms = (end - start) * 1000
         from helper import log_info_to_channel
         await log_info_to_channel(1377200295389565020,f"`reset_specific_user` completed in {elapsed_ms:.3f}ms")
+
+
+    async def set_logging_channel(self, guild_id: int, channel_id: int):
+
+        # Make sure to update the value in cache too
+        if guild_id in server_settings:
+            server: Optional[Server] = server_settings.pop(guild_id, None)
+            if server is not None:
+                server.set_logging_channel_id(channel_id=channel_id)
+
+        try:
+            if connection:
+                key = f"server_settings:{guild_id}"
+
+                await connection.hset(key, "logging_channel", channel_id) # type: ignore
+            else:
+                print(DATABASE_NOT_CONNECTED_MESSAGE)
+
+        except Exception as error:
+            print(f"Error inserting data: {error}")
+
+
+    async def get_logging_channel(self, guild_id: int) -> Optional[int]:
+
+        # If server setting is already in cache, grab that
+        if guild_id in server_settings:
+            server: Server = server_settings.pop(guild_id)
+            return server.get_logging_channel_id()
+
+        # If not in cache, grab it from the database and also put it in cache
+        else:
+            try:
+                if connection:
+                    key = f"server_settings:{guild_id}"
+
+                    channel_id_bytes: Optional[bytes] = await connection.hget(key, "logging_channel") # type: ignore
+                    if channel_id_bytes is None:
+                        return None
+                    
+                    channel_id = int(channel_id_bytes.decode())
+                    
+                    new_server_setting: Server = Server(logging_channel=channel_id)
+                    server_settings[guild_id] = new_server_setting
+
+                    return channel_id
+                else:
+                    print(DATABASE_NOT_CONNECTED_MESSAGE)
+                    return None
+            except Exception as error:
+                print(f"Error retrieving data: {error}")
+                return None
