@@ -14,7 +14,8 @@ from logging_stuff import fetch_stats
 cache_options = (
     hikari.api.CacheComponents.VOICE_STATES |# Only want the cache for voice states
     hikari.api.CacheComponents.ROLES | # Required to do permission checks
-    hikari.api.CacheComponents.MEMBERS # Required to retreive member information given just user_id
+    hikari.api.CacheComponents.MEMBERS | # Required to retreive member information given just user_id
+    hikari.api.CacheComponents.GUILD_CHANNELS
 )
 
 # Initialize the bot - NEW SYNTAX for Lightbulb 2.x

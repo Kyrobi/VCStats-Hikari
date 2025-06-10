@@ -62,19 +62,33 @@ async def handle_join(voice_state: hikari.VoiceState):
     await start_tracking_user(voice_state.user_id, voice_state.guild_id)
 
     # Send to event logging channel
-    logging_channel_id: Optional[int] = await datastore.get_logging_channel(voice_state.guild_id)
-    if logging_channel_id:
-        voice_channel_id: Optional[int] = voice_state.channel_id
-        if voice_channel_id:
-            channel_name = plugin.app.cache.get_guild(voice_channel_id)
+    try:
+        logging_channel_id: Optional[int] = await datastore.get_logging_channel(voice_state.guild_id)
+        if logging_channel_id:
+            voice_channel_id: Optional[int] = voice_state.channel_id
+            if voice_channel_id:
+                channel_name = plugin.app.cache.get_guild(voice_channel_id)
 
-            if channel_name is None:
-                channel_name = await plugin.app.rest.fetch_channel(voice_channel_id)
+                if channel_name is None:
+                    channel_name = await plugin.app.rest.fetch_channel(voice_channel_id)
 
-            message = textwrap.dedent(f"""\
-            `{voice_state.member}` joined `{channel_name}`
-            """)
-            await plugin.app.rest.create_message(logging_channel_id, message)
+                message = textwrap.dedent(f"""\
+                `{voice_state.member}` joined `{channel_name}`
+                """)
+                await plugin.app.rest.create_message(logging_channel_id, message)
+    except:
+        pass
+
+    # try:
+    #     # Check if the user has a logging channel set up.
+    #     logging_channel_id: Optional[int] = await datastore.get_logging_channel(voice_state.guild_id)
+    #     if logging_channel_id:
+    #         message = textwrap.dedent(f"""\
+    #         `{voice_state.member}` joined `{channel_name}`
+    #         """)
+    #         await plugin.app.rest.create_message(logging_channel_id, message)
+    # except:
+    #     ...
 
 
 async def handle_leave(voice_state: hikari.VoiceState):

@@ -41,10 +41,20 @@ async def status_command(e: lightbulb.Context) -> None:
                 await e.respond("Please provide the server ID for this server.")
                 return
             
-            logging_channel_id: hikari.Snowflake = partial_channel.id
-            await e.respond(f"Event logs will be sent to `{partial_channel}`")
+            # We verify that the logging channel is inside from the same guild - incase a mod is used to
+            # set the channel from a different guild
+            try:
+                full_channel: Optional[hikari.PartialChannel] = await plugin.app.rest.fetch_channel(partial_channel.id)
+                if not isinstance(full_channel, hikari.GuildChannel) or full_channel.guild_id != e.guild_id:
+                    await e.respond("Error setting the channel")
+                    return
+                
+                logging_channel_id: hikari.Snowflake = partial_channel.id
+                await e.respond(f"Event logs will be sent to `{partial_channel}`")
 
-            await datastore.set_logging_channel(guild_id=e.guild_id, channel_id=logging_channel_id)
+                await datastore.set_logging_channel(guild_id=e.guild_id, channel_id=logging_channel_id)
+            except:
+                pass
 
         except hikari.errors.BadRequestError:
             await e.respond("That is not a valid channel")
