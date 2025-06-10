@@ -14,8 +14,7 @@ from logging_stuff import fetch_stats
 cache_options = (
     hikari.api.CacheComponents.VOICE_STATES |# Only want the cache for voice states
     hikari.api.CacheComponents.ROLES | # Required to do permission checks
-    hikari.api.CacheComponents.MEMBERS | # Required to retreive member information given just user_id
-    hikari.api.CacheComponents.GUILD_CHANNELS
+    hikari.api.CacheComponents.MEMBERS # Required to retreive member information given just user_id
 )
 
 # Initialize the bot - NEW SYNTAX for Lightbulb 2.x
@@ -44,7 +43,6 @@ async def on_starting(event: hikari.StartingEvent) -> None:
     bot.load_extensions("commands.command_leaderboard")
     bot.load_extensions("commands.command_reset_guild_stats")
     bot.load_extensions("commands.command_reset_user_stats")
-    bot.load_extensions("commands.command_set_logging")
 
     bot.load_extensions("logging_stuff")
 

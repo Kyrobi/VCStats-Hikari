@@ -1,4 +1,3 @@
-import textwrap
 import lightbulb
 import hikari
 
@@ -6,7 +5,6 @@ from typing import Optional
 from helper import make_key, start_tracking_user
 from logging_stuff import increment_member_join, increment_member_left, increment_member_move
 from datastore import Datastore
-from objects.server import Server
 
 
 plugin = lightbulb.Plugin("event_handler")
@@ -61,35 +59,6 @@ async def handle_join(voice_state: hikari.VoiceState):
     increment_member_join()
     await start_tracking_user(voice_state.user_id, voice_state.guild_id)
 
-    # Send to event logging channel
-    try:
-        logging_channel_id: Optional[int] = await datastore.get_logging_channel(voice_state.guild_id)
-        if logging_channel_id:
-            voice_channel_id: Optional[int] = voice_state.channel_id
-            if voice_channel_id:
-                channel_name = plugin.app.cache.get_guild(voice_channel_id)
-
-                if channel_name is None:
-                    channel_name = await plugin.app.rest.fetch_channel(voice_channel_id)
-
-                message = textwrap.dedent(f"""\
-                `{voice_state.member}` joined `{channel_name}`
-                """)
-                await plugin.app.rest.create_message(logging_channel_id, message)
-    except:
-        pass
-
-    # try:
-    #     # Check if the user has a logging channel set up.
-    #     logging_channel_id: Optional[int] = await datastore.get_logging_channel(voice_state.guild_id)
-    #     if logging_channel_id:
-    #         message = textwrap.dedent(f"""\
-    #         `{voice_state.member}` joined `{channel_name}`
-    #         """)
-    #         await plugin.app.rest.create_message(logging_channel_id, message)
-    # except:
-    #     ...
-
 
 async def handle_leave(voice_state: hikari.VoiceState):
     
@@ -110,23 +79,6 @@ async def handle_leave(voice_state: hikari.VoiceState):
     async with datastore.get_tracking_queue_lock():
         datastore.get_tracking_queue().pop(dict_key, None)
 
-    # Send to event logging channel
-    logging_channel_id: Optional[int] = await datastore.get_logging_channel(voice_state.guild_id)
-    if logging_channel_id:
-
-        voice_channel_id: Optional[int] = voice_state.channel_id
-        if voice_channel_id:
-            channel_name = plugin.app.cache.get_guild(voice_channel_id)
-
-            if channel_name is None:
-                channel_name = await plugin.app.rest.fetch_channel(voice_channel_id)
-
-            message = textwrap.dedent(f"""\
-            `{voice_state.member}` left `{channel_name}`
-            """)
-
-            await plugin.app.rest.create_message(logging_channel_id, message)
-
 
 async def handle_switch(old_voice_state: hikari.VoiceState, new_voice_state: hikari.VoiceState):
     # UPDATE: We don't actually care about if the user switch channels
@@ -136,29 +88,6 @@ async def handle_switch(old_voice_state: hikari.VoiceState, new_voice_state: hik
     # This function will effectively only be used for logging purposes
     # print(f"{new_voice_state.member} switched channel")
     increment_member_move()
-
-    # Send to event logging channel
-    logging_channel_id: Optional[int] = await datastore.get_logging_channel(new_voice_state.guild_id)
-    if logging_channel_id:
-
-        voice_channel_id_old: Optional[int] = old_voice_state.channel_id
-        voice_channel_id_new: Optional[int] = new_voice_state.channel_id
-
-        if voice_channel_id_old and voice_channel_id_new:
-            channel_name_old = plugin.app.cache.get_guild(voice_channel_id_old)
-            channel_name_new = plugin.app.cache.get_guild(voice_channel_id_new)
-
-            if channel_name_old is None:
-                channel_name_old = await plugin.app.rest.fetch_channel(voice_channel_id_old)
-
-            if channel_name_new is None:
-                channel_name_new = await plugin.app.rest.fetch_channel(voice_channel_id_new)
-
-            message = textwrap.dedent(f"""\
-            `{new_voice_state.member}` moved from `{channel_name_old}` to `{channel_name_new}`
-            """)
-
-            await plugin.app.rest.create_message(logging_channel_id, message)
 
 
 # REQUIRED FUNCTION - Lightbulb looks for this
