@@ -21,15 +21,17 @@ def get_message() -> str:
     **Commands**:
     ```
     /stats - View your call time for the current server
+                     
     /leaderboard - View the vc leaderboard for your server
+                     
     /donate - If you wish to donate money
     ```
     **Administrator Commands**:
     (Need administrator permission)
     ```
     /resetall - Reset EVERYONE's total voice time. This can't be undone!!!
+                     
     /resetuser - Reset specific person's total voice time. This can't be undone!!!
-    /vc_logging - Sets the channel to log join and leave notifications to
     ```
     """).strip()
 
